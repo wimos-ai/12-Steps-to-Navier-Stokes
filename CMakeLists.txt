@@ -28,6 +28,8 @@ add_subdirectory(libs/SDL3 EXCLUDE_FROM_ALL)
 set(SDLTTF_VENDORED ON)
 add_subdirectory(libs/SDL3_TTF EXCLUDE_FROM_ALL)
 
+add_subdirectory(libs/Eigen)
+
 # ============================================================
 # Dear ImGui
 # ============================================================
@@ -72,6 +74,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3
     imgui
+    Eigen3::Eigen
+    SDL3_ttf::SDL3_ttf
 )
 
 # ============================================================

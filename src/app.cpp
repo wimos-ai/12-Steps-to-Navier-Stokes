@@ -16,7 +16,7 @@ void App::backend_init()
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
     {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
-        return std::exit(-1);
+        std::exit(-1);
     }
 
     // --------------------------------------------------------

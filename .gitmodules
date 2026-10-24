@@ -10,3 +10,7 @@
 	path = libs/SDL3_TTF
 	url = https://github.com/libsdl-org/SDL_ttf.git
 	branch = release-3.2.x
+[submodule "libs/Eigen"]
+	path = libs/Eigen
+	url = https://gitlab.com/libeigen/eigen.git
+	branch = 3.4
