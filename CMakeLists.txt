@@ -25,6 +25,9 @@ set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(libs/SDL3 EXCLUDE_FROM_ALL)
 
+set(SDLTTF_VENDORED ON)
+add_subdirectory(libs/SDL3_TTF EXCLUDE_FROM_ALL)
+
 # ============================================================
 # Dear ImGui
 # ============================================================

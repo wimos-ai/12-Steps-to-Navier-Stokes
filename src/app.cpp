@@ -18,6 +18,17 @@ void App::backend_init()
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return std::exit(-1);
     }
+
+    // --------------------------------------------------------
+    // Initialize Dear ImGui
+    // --------------------------------------------------------
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+
+    ImGuiIO &io = ImGui::GetIO();
+
+    ImGui::StyleColorsDark();
 }
 
 App::App() : renderer(nullptr), window(nullptr), scene(nullptr)
@@ -48,16 +59,7 @@ App::App() : renderer(nullptr), window(nullptr), scene(nullptr)
     // Enable VSync when supported.
     SDL_SetRenderVSync(renderer, 1);
 
-    // --------------------------------------------------------
-    // Initialize Dear ImGui
-    // --------------------------------------------------------
-
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-
-    ImGuiIO &io = ImGui::GetIO();
-
-    ImGui::StyleColorsDark();
+    // Hook IMGUI up to SDL
 
     if (!ImGui_ImplSDL3_InitForSDLRenderer(window, renderer))
     {
@@ -81,6 +83,9 @@ App::App() : renderer(nullptr), window(nullptr), scene(nullptr)
         SDL_Quit();
         std::exit(-1);
     }
+
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     this->scene = std::make_unique<TestScene>();
 }
@@ -110,6 +115,14 @@ void App::run()
         }
 
         this->scene->render(this->renderer);
+
+        // Update and Render additional Platform Windows
+        // See https://github.com/ocornut/imgui/wiki/Multi-Viewports
+        if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+        }
     }
 
     // --------------------------------------------------------

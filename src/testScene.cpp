@@ -74,9 +74,6 @@ void TestScene::render(SDL_Renderer *renderer)
         0.1f,
         2.0f);
 
-    // Generate waveform samples.
-    constexpr float TWO_PI = 6.28318530718f;
-
     for (std::size_t i = 0; i < waveform.size(); ++i)
     {
         const float x =
@@ -85,7 +82,7 @@ void TestScene::render(SDL_Renderer *renderer)
 
         waveform[i] =
             amplitude * std::sin(
-                            TWO_PI * frequency * x + elapsed_time);
+                            2 * std::numbers::pi * frequency * x + elapsed_time);
     }
 
     ImGui::PlotLines(
