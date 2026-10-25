@@ -107,14 +107,14 @@ int main()
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(renderer);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-        std::vector<double> x_values = linspace(0, 10, 1000);
+        std::vector<double> x_values = linspace(1, 10, 1000);
         std::vector<double> y_values(x_values.size());
         std::transform(
             x_values.begin(),
             x_values.end(),
             y_values.begin(),
             [](double x)
-            { return std::sin(x); }
+            { return x*x; }
         );
         render_graph(renderer, x_values, y_values);
 
