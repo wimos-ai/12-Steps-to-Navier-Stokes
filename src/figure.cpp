@@ -48,6 +48,24 @@ namespace
         }
     }
 
+    void DrawFilledCircle(SDL_Renderer *renderer, double x, double y, double radius)
+    {
+        // See: https://stackoverflow.com/questions/65723827/sdl2-function-to-draw-a-filled-circle
+        // TODO: Fix with a more efficient version.
+        for (int w = 0; w < radius * 2; w++)
+        {
+            for (int h = 0; h < radius * 2; h++)
+            {
+                int dx = radius - w; // horizontal offset
+                int dy = radius - h; // vertical offset
+                if ((dx * dx + dy * dy) <= (radius * radius))
+                {
+                    SDL_RenderPoint(renderer, x + dx, y + dy);
+                }
+            }
+        }
+    }
+
     void drawHTextInZone(SDL_Renderer *renderer, const SDL_FRect &zone, const std::string &txt)
     {
         // Draws horizontal text in zone
@@ -211,6 +229,8 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     // Render blank graph background grid
 
     // Render graph objects
+    // TODO: Fix draw order so circles plotted at the edge of the graph
+    // Don't exscape onto the general canvas
     auto visitor = [renderer, transform, positioning](const auto &i)
     {
         i.render(renderer, transform, positioning.inner_graph_zone);
@@ -360,6 +380,6 @@ double Figure::Rect::area() const
 void Figure::DrawablePoint::render(SDL_Renderer *renderer, auto transform, const SDL_FRect &graph_area) const
 {
     auto ss_point = transform(this->x, this->y);
-    auto radius = std::min(graph_area.h, graph_area.w) * 0.025;
-    DrawCircle(renderer, ss_point.x, ss_point.y, radius);
+    auto radius = std::min(graph_area.h, graph_area.w) * 0.05;
+    DrawFilledCircle(renderer, ss_point.x, ss_point.y, radius);
 }
