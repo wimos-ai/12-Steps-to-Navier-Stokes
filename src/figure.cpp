@@ -1,6 +1,7 @@
 #include "figure.hpp"
 
 #include <cstring>
+#include <ranges>
 #include <algorithm>
 
 #include <SDL3/SDL.h>
@@ -47,22 +48,32 @@ namespace
         }
     }
 
-    void drawHTextInZone(SDL_Renderer *renderer, const SDL_FRect &zone)
+    void drawHTextInZone(SDL_Renderer *renderer, const SDL_FRect &zone, const std::string &txt)
     {
         // Draws horizontal text in zone
         // TODO
+        SDL_RenderFillRect(renderer, &zone);
     }
 
-    void drawVTextInZone(SDL_Renderer *renderer, const SDL_FRect &zone)
+    void drawVTextInZone(SDL_Renderer *renderer, const SDL_FRect &zone, const std::string &txt)
     {
-        // Draws horizontal text in zone
+        // Draws vertical text in zone
         // TODO
+        SDL_RenderFillRect(renderer, &zone);
     }
+
+    auto linspace(double start, double end, size_t num)
+    {
+        double step = (num > 1) ? (end - start) / (num - 1) : 0.0;
+        return std::views::iota(std::size_t{0}, num) | std::views::transform([=](std::size_t i)
+                                                                             { return start + i * step; });
+    }
+
 }
 
 void Figure::set_graph_area(double x0, double xf, double y0, double yf)
 {
-    this->draw_area = Rect(x0, y0, xf, yf);
+    this->graph_area = Rect(x0, y0, xf, yf);
 }
 
 void Figure::set_title(std::string title)
@@ -95,12 +106,21 @@ void Figure::clear()
     this->draw_data.clear();
 }
 
-auto determine_graph_transform(Figure::Rect r1, SDL_FRect r2)
+auto determine_graph_transform(const Figure::Rect &r1, const SDL_FRect &r2)
 {
-    /// Determines the transform from graph coordinates to SDL canvas coordinates
+    /// Determines the affine transform from graph coordinates to SDL canvas coordinates
     // TODO
-    return [=](double x, double y) -> SDL_FPoint
-    { return {0, 0}; };
+
+    return [=](double x_in, double y_in) -> SDL_FPoint
+    {
+        double x_percent = (x_in - r1.x0) / (r1.xf - r1.x0);
+        double x_out = (r2.w * x_percent) + r2.x;
+
+        double y_percent = (y_in - r1.y0) / (r1.yf - r1.y0);
+        double y_out = (r2.h * (1.0 - y_percent)) + r2.y;
+
+        return {static_cast<float>(x_out), static_cast<float>(y_out)};
+    };
 }
 
 auto determine_layout(const SDL_Rect &render_area)
@@ -115,7 +135,41 @@ auto determine_layout(const SDL_Rect &render_area)
         SDL_FRect ylabel_zone;
     };
 
-    Layout p;
+    Layout p{};
+
+    // Determine graph area
+
+    constexpr double H_PAD = 0.1;
+    constexpr double W_PAD = 0.1;
+    constexpr int BOARDER_WIDTH = 5;
+
+    p.outer_graph_zone.x = render_area.x + W_PAD * render_area.w;
+    p.outer_graph_zone.h = (1.0 - (2 * H_PAD)) * render_area.h;
+    p.outer_graph_zone.y = render_area.y + H_PAD * render_area.h;
+    p.outer_graph_zone.w = (1.0 - (2 * W_PAD)) * render_area.w;
+
+    p.inner_graph_zone.x = p.outer_graph_zone.x + BOARDER_WIDTH;
+    p.inner_graph_zone.h = p.outer_graph_zone.h - (2 * BOARDER_WIDTH);
+    p.inner_graph_zone.y = p.outer_graph_zone.y + BOARDER_WIDTH;
+    p.inner_graph_zone.w = p.outer_graph_zone.w - (2 * BOARDER_WIDTH);
+
+    // Title Zone
+    p.title_zone.x = render_area.x;
+    p.title_zone.h = render_area.h * 0.1;
+    p.title_zone.y = render_area.y;
+    p.title_zone.w = render_area.w;
+
+    // YLabel Zone
+    p.ylabel_zone.x = render_area.x;
+    p.ylabel_zone.w = W_PAD * render_area.w;
+    p.ylabel_zone.y = p.inner_graph_zone.y;
+    p.ylabel_zone.h = p.inner_graph_zone.h;
+
+    // XLabel Zone
+    p.xlabel_zone.x = p.inner_graph_zone.x;
+    p.xlabel_zone.w = p.inner_graph_zone.w;
+    p.xlabel_zone.y = p.inner_graph_zone.y + p.inner_graph_zone.h + BOARDER_WIDTH;
+    p.xlabel_zone.h = p.title_zone.h;
 
     return p;
 }
@@ -140,7 +194,21 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     auto transform = determine_graph_transform(this->determine_graph_area(), positioning.inner_graph_zone);
 
     // Render blank graph
-    // TODO
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &positioning.outer_graph_zone);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &positioning.inner_graph_zone);
+
+    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 128);
+    drawHTextInZone(renderer, positioning.title_zone, this->title.value_or(""));
+
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 128);
+    drawHTextInZone(renderer, positioning.xlabel_zone, this->x_label.value_or(""));
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 128);
+    drawVTextInZone(renderer, positioning.ylabel_zone, this->y_label.value_or(""));
+
+    // Render blank graph background grid
 
     // Render graph objects
     auto visitor = [renderer, transform, positioning](const auto &i)
@@ -156,28 +224,41 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
 
 Figure::Rect Figure::determine_graph_area()
 {
-    if (this->draw_data.empty())
+    Figure::Rect r = [this]()
     {
-        return Rect(-10, -10, 10, 10);
-    }
+        if (this->graph_area.has_value())
+        {
+            return this->graph_area.value();
+        }
 
-    auto get_draw_area_visitor = [](const auto &d) -> Figure::Rect
-    {
-        return d.get_render_area();
-    };
+        if (this->draw_data.empty())
+        {
+            return Rect(-10, -10, 10, 10);
+        }
 
-    Rect r = std::visit(get_draw_area_visitor, this->draw_data[0]);
+        auto get_draw_area_visitor = [](const auto &d) -> Figure::Rect
+        {
+            return d.get_render_area();
+        };
 
-    for (const auto &i : draw_data)
-    {
-        auto area = std::visit(get_draw_area_visitor, i);
-        r = r.get_bounding_volume(area);
-    }
+        Rect r = std::visit(get_draw_area_visitor, this->draw_data[0]);
 
-    if (r.area() == 0)
+        for (const auto &i : draw_data)
+        {
+            auto area = std::visit(get_draw_area_visitor, i);
+            r = r.get_bounding_volume(area);
+        }
+        return r;
+    }();
+
+    if (r.x0 == r.xf)
     {
         r.x0 -= 10;
         r.xf += 10;
+    }
+
+    if (r.y0 == r.yf)
+    {
         r.y0 -= 10;
         r.yf += 10;
     }

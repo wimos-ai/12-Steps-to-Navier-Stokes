@@ -22,6 +22,7 @@
 #include <algorithm>
 
 #include "render_graph.hpp"
+#include "figure.hpp"
 
 std::vector<double> linspace(double start, double end, size_t num)
 {
@@ -82,6 +83,17 @@ int main()
 
     // Enable VSync when supported.
     SDL_SetRenderVSync(renderer, 1);
+    Figure fig;
+    std::vector<double> x_values = linspace(0, 3.14159 * 2.0, 1000);
+    std::vector<double> y_values(x_values.size());
+    std::transform(
+        x_values.begin(),
+        x_values.end(),
+        y_values.begin(),
+        [](double x)
+        { return std::sin(x); });
+    fig.plot(0, 0);
+    fig.plot(x_values, y_values);
 
     bool running{true};
     while (running)
@@ -106,17 +118,8 @@ int main()
 
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(renderer);
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-        std::vector<double> x_values = linspace(1, 10, 1000);
-        std::vector<double> y_values(x_values.size());
-        std::transform(
-            x_values.begin(),
-            x_values.end(),
-            y_values.begin(),
-            [](double x)
-            { return x*x; }
-        );
-        render_graph(renderer, x_values, y_values);
+
+        fig.render(renderer);
 
         SDL_RenderPresent(renderer);
     }

@@ -48,7 +48,7 @@ private:
         double x0, y0, xf, yf;
     };
 
-    friend auto determine_graph_transform(Figure::Rect r1, SDL_FRect r2);
+    friend auto determine_graph_transform(const Figure::Rect &r1, const SDL_FRect &r2);
 
 private:
     class DrawableFunction
@@ -86,7 +86,7 @@ private:
         ~DrawableFunction(); // TODO: Free x and y values
 
     private:
-        void render(SDL_Renderer *renderer, auto transform, const SDL_FRect& graph_area) const;
+        void render(SDL_Renderer *renderer, auto transform, const SDL_FRect &graph_area) const;
 
     public:
         Rect get_render_area() const;
@@ -108,7 +108,7 @@ private:
         };
 
     private:
-        void render(SDL_Renderer *renderer, auto transform, const SDL_FRect& graph_area) const;
+        void render(SDL_Renderer *renderer, auto transform, const SDL_FRect &graph_area) const;
 
     private:
         double x, y;
@@ -124,7 +124,7 @@ private:
     std::optional<std::string> x_label;
     std::optional<std::string> y_label;
 
-    std::optional<Rect> draw_area;
+    std::optional<Rect> graph_area;
 
     std::vector<UDrawable> draw_data;
 };
