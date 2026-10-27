@@ -51,18 +51,20 @@ namespace
     void DrawFilledCircle(SDL_Renderer *renderer, double x, double y, double radius)
     {
         // See: https://stackoverflow.com/questions/65723827/sdl2-function-to-draw-a-filled-circle
-        // TODO: Fix with a more efficient version.
-        for (int w = 0; w < radius * 2; w++)
+        for (int h = 0; h < radius; h++)
         {
-            for (int h = 0; h < radius * 2; h++)
+            for (int w = 0; w < radius; w++)
             {
                 int dx = radius - w; // horizontal offset
                 int dy = radius - h; // vertical offset
-                if ((dx * dx + dy * dy) <= (radius * radius))
+                if ((dx * dx + dy * dy) < (radius * radius))
                 {
-                    SDL_RenderPoint(renderer, x + dx, y + dy);
+                    SDL_RenderLine(renderer,x+dx,y+dy,x-dx, y+dy);
+                    SDL_RenderLine(renderer,x+dx,y-dy,x-dx, y-dy);
+                    goto drawn_line;
                 }
             }
+            drawn_line:
         }
     }
 

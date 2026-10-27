@@ -92,7 +92,7 @@ int main()
         y_values.begin(),
         [](double x)
         { return std::sin(x); });
-    fig.plot(0, 0);
+    fig.plot(2, -0.5);
     fig.plot(x_values, y_values);
 
     bool running{true};
