@@ -15,8 +15,8 @@ public:
     void run();
 
 private:
-    SDL_Window *window;
-    SDL_Renderer *renderer;
+    SDL_Window *window{nullptr};
+    SDL_Renderer *renderer{nullptr};
     uint64_t previous_time;
     std::unique_ptr<IScene> scene;
 };

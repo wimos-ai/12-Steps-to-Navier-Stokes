@@ -6,10 +6,11 @@
 #include <vector>
 #include <variant>
 #include <memory>
+#include <utility>
 
 #include <SDL3/SDL.h>
 
-class SDL_Renderer;
+struct TTF_Font;
 
 class Figure
 {
@@ -127,4 +128,62 @@ private:
     std::optional<Rect> graph_area;
 
     std::vector<UDrawable> draw_data;
+
+private:
+    struct Layout
+    {
+        SDL_FRect outer_graph_zone;
+        SDL_FRect inner_graph_zone;
+        SDL_FRect title_zone;
+        SDL_FRect xlabel_zone;
+        SDL_FRect ylabel_zone;
+    };
+
+    static Layout determine_layout(const SDL_Rect &render_area);
+
+    struct RenderCache
+    {
+        Layout layout{};
+        SDL_Surface *title{nullptr};
+        SDL_Surface *xlabel{nullptr};
+        SDL_Surface *ylabel{nullptr};
+        SDL_Rect area{};
+
+        RenderCache() = default;
+
+        ~RenderCache();
+        inline RenderCache(RenderCache &&other) noexcept
+            : layout(other.layout),
+              title(std::exchange(other.title, nullptr)),
+              xlabel(std::exchange(other.xlabel, nullptr)),
+              ylabel(std::exchange(other.ylabel, nullptr)),
+              area(other.area)
+        {
+        }
+
+        inline RenderCache &operator=(RenderCache &&other) noexcept
+        {
+            this->layout = other.layout;
+            this->area = other.area;
+            this->title = std::exchange(other.title, nullptr);
+            this->xlabel = std::exchange(other.xlabel, nullptr);
+            this->ylabel = std::exchange(other.ylabel, nullptr);
+            return *this;
+        }
+
+        // No copy assignment
+        RenderCache(const RenderCache &) = delete;
+        RenderCache &operator=(const RenderCache &) = delete;
+    };
+
+    RenderCache &get_render_info(const SDL_Rect &render_area);
+
+    std::optional<RenderCache> cache;
+
+public:
+    static void FigureInit();
+    static void FigureInit(TTF_Font *font);
+
+    static void FigureQuit();
+    static TTF_Font *font;
 };

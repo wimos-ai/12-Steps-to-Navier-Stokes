@@ -1,5 +1,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
@@ -19,6 +20,13 @@ void App::backend_init()
         std::exit(-1);
     }
 
+    if (!TTF_Init())
+    {
+        SDL_Log("TTF_Init Error: %s", SDL_GetError());
+        SDL_Quit();
+        std::exit(-1);
+    }
+
     // --------------------------------------------------------
     // Initialize Dear ImGui
     // --------------------------------------------------------
@@ -26,12 +34,10 @@ void App::backend_init()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
 
-    ImGuiIO &io = ImGui::GetIO();
-
     ImGui::StyleColorsDark();
 }
 
-App::App() : renderer(nullptr), window(nullptr), scene(nullptr)
+App::App() : window(nullptr), renderer(nullptr), scene(nullptr)
 {
     window = SDL_CreateWindow(
         "SDL3 + Dear ImGui Test",
@@ -136,6 +142,6 @@ void App::run()
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-
+    TTF_Init();
     SDL_Quit();
 }

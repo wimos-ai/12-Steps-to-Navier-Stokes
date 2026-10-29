@@ -6,48 +6,12 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3_ttf/SDL_ttf.h>
+
+TTF_Font *Figure::font{nullptr};
 
 namespace
 {
-    void DrawCircle(SDL_Renderer *renderer, int32_t centreX, int32_t centreY, int32_t radius)
-    {
-        // See: https://stackoverflow.com/questions/38334081/how-to-draw-circles-arcs-and-vector-graphics-in-sdl
-        const int32_t diameter = (radius * 2);
-
-        int32_t x = (radius - 1);
-        int32_t y = 0;
-        int32_t tx = 1;
-        int32_t ty = 1;
-        int32_t error = (tx - diameter);
-
-        while (x >= y)
-        {
-            //  Each of the following renders an octant of the circle
-            SDL_RenderPoint(renderer, centreX + x, centreY - y);
-            SDL_RenderPoint(renderer, centreX + x, centreY + y);
-            SDL_RenderPoint(renderer, centreX - x, centreY - y);
-            SDL_RenderPoint(renderer, centreX - x, centreY + y);
-            SDL_RenderPoint(renderer, centreX + y, centreY - x);
-            SDL_RenderPoint(renderer, centreX + y, centreY + x);
-            SDL_RenderPoint(renderer, centreX - y, centreY - x);
-            SDL_RenderPoint(renderer, centreX - y, centreY + x);
-
-            if (error <= 0)
-            {
-                ++y;
-                error += ty;
-                ty += 2;
-            }
-
-            if (error > 0)
-            {
-                --x;
-                tx += 2;
-                error += (tx - diameter);
-            }
-        }
-    }
-
     void DrawFilledCircle(SDL_Renderer *renderer, double x, double y, double radius)
     {
         // See: https://stackoverflow.com/questions/65723827/sdl2-function-to-draw-a-filled-circle
@@ -59,70 +23,120 @@ namespace
                 int dy = radius - h; // vertical offset
                 if ((dx * dx + dy * dy) < (radius * radius))
                 {
-                    SDL_RenderLine(renderer,x+dx,y+dy,x-dx, y+dy);
-                    SDL_RenderLine(renderer,x+dx,y-dy,x-dx, y-dy);
-                    goto drawn_line;
+                    SDL_RenderLine(renderer, x + dx, y + dy, x - dx, y + dy);
+                    SDL_RenderLine(renderer, x + dx, y - dy, x - dx, y - dy);
+                    break;
                 }
             }
-            drawn_line:
         }
     }
 
-    void drawHTextInZone(SDL_Renderer *renderer, const SDL_FRect &zone, const std::string &txt)
+    SDL_FRect determine_h_rectangle(const SDL_FRect &zone, int w, int h)
+    {
+        SDL_FRect out;
+        float y_scale = zone.h / h;
+        float x_scale = zone.w / w;
+
+        if (x_scale < y_scale)
+        {
+            out.w = x_scale * w;
+            out.h = x_scale * h;
+            out.x = zone.x;
+            out.y = zone.y + ((zone.h - out.h) / 2);
+        }
+        else
+        {
+            out.w = y_scale * w;
+            out.h = y_scale * h;
+            out.x = zone.x + ((zone.w - out.w) / 2);
+            out.y = zone.y;
+        }
+        return out;
+    }
+
+    void drawHTextInZone(SDL_Renderer *renderer, const SDL_FRect &zone, SDL_Surface *surface)
     {
         // Draws horizontal text in zone
-        // TODO
-        SDL_RenderFillRect(renderer, &zone);
+        if (surface)
+        {
+            SDL_Texture *tx = SDL_CreateTextureFromSurface(renderer, surface);
+
+            if (!tx)
+            {
+                SDL_Log("SDL_CreateTextureFromSurface Error: %s", SDL_GetError());
+                std::exit(-1);
+            }
+
+            auto dst = determine_h_rectangle(zone, tx->w, tx->h);
+
+            SDL_RenderTexture(renderer, tx, NULL, &dst);
+
+            SDL_DestroyTexture(tx);
+        }
     }
 
-    void drawVTextInZone(SDL_Renderer *renderer, const SDL_FRect &zone, const std::string &txt)
+    void drawVTextInZone(SDL_Renderer *renderer, const SDL_FRect &zone, SDL_Surface *surface)
     {
         // Draws vertical text in zone
-        // TODO
-        SDL_RenderFillRect(renderer, &zone);
-    }
+        if (surface)
+        {
+            SDL_Texture *tx = SDL_CreateTextureFromSurface(renderer, surface);
 
-    auto linspace(double start, double end, size_t num)
-    {
-        double step = (num > 1) ? (end - start) / (num - 1) : 0.0;
-        return std::views::iota(std::size_t{0}, num) | std::views::transform([=](std::size_t i)
-                                                                             { return start + i * step; });
+            if (!tx)
+            {
+                SDL_Log("SDL_CreateTextureFromSurface Error: %s", SDL_GetError());
+                std::exit(-1);
+            }
+
+            auto dst = determine_h_rectangle(zone, tx->w, tx->h);
+
+            SDL_RenderTextureRotated(renderer, tx, NULL, &dst, 270, NULL, SDL_FLIP_NONE);
+
+            SDL_DestroyTexture(tx);
+        }
     }
 
 }
 
 void Figure::set_graph_area(double x0, double xf, double y0, double yf)
 {
+    this->cache.reset();
     this->graph_area = Rect(x0, y0, xf, yf);
 }
 
 void Figure::set_title(std::string title)
 {
+    this->cache.reset();
     this->title = title;
 }
 
 void Figure::set_x_label(std::string label)
 {
+    this->cache.reset();
     this->x_label = label;
 }
 
 void Figure::set_y_label(std::string label)
 {
+    this->cache.reset();
     this->y_label = label;
 }
 
 void Figure::plot(std::span<double> x, std::span<double> y)
 {
+    this->cache.reset();
     this->draw_data.emplace_back(std::in_place_type<Figure::DrawableFunction>, x, y);
 }
 
 void Figure::plot(double x, double y)
 {
+    this->cache.reset();
     this->draw_data.emplace_back(std::in_place_type<Figure::DrawablePoint>, x, y);
 }
 
 void Figure::clear()
 {
+    this->cache.reset();
     this->draw_data.clear();
 }
 
@@ -143,24 +157,14 @@ auto determine_graph_transform(const Figure::Rect &r1, const SDL_FRect &r2)
     };
 }
 
-auto determine_layout(const SDL_Rect &render_area)
+Figure::Layout Figure::determine_layout(const SDL_Rect &render_area)
 {
-    // TODO
-    struct Layout
-    {
-        SDL_FRect outer_graph_zone;
-        SDL_FRect inner_graph_zone;
-        SDL_FRect title_zone;
-        SDL_FRect xlabel_zone;
-        SDL_FRect ylabel_zone;
-    };
-
-    Layout p{};
+    Figure::Layout p{};
 
     // Determine graph area
 
-    constexpr double H_PAD = 0.1;
-    constexpr double W_PAD = 0.1;
+    constexpr double H_PAD = 0.05;
+    constexpr double W_PAD = 0.05;
     constexpr int BOARDER_WIDTH = 5;
 
     p.outer_graph_zone.x = render_area.x + W_PAD * render_area.w;
@@ -175,7 +179,7 @@ auto determine_layout(const SDL_Rect &render_area)
 
     // Title Zone
     p.title_zone.x = render_area.x;
-    p.title_zone.h = render_area.h * 0.1;
+    p.title_zone.h = render_area.h * H_PAD;
     p.title_zone.y = render_area.y;
     p.title_zone.w = render_area.w;
 
@@ -194,6 +198,114 @@ auto determine_layout(const SDL_Rect &render_area)
     return p;
 }
 
+Figure::RenderCache &Figure::get_render_info(const SDL_Rect &render_area)
+{
+    if (this->cache.has_value())
+    {
+        const SDL_Rect &cached_area = this->cache.value().area;
+        if (cached_area.h == render_area.h &&
+            cached_area.w == render_area.w &&
+            cached_area.x == render_area.x &&
+            cached_area.y == render_area.y)
+        {
+            return this->cache.value();
+        }
+    }
+    this->cache.reset();
+    this->cache.emplace();
+    cache.value().layout = determine_layout(render_area);
+    cache.value().area = render_area;
+
+    SDL_Color black{0, 0, 0, SDL_ALPHA_OPAQUE};
+
+    if (this->title.has_value())
+    {
+        const auto &title = this->title.value();
+        auto surface = TTF_RenderText_Solid(Figure::font, title.data(), title.size(), black);
+        if (!surface)
+        {
+            SDL_Log("TTF_RenderText_Solid Error: %s", SDL_GetError());
+            exit(-1);
+        }
+        cache.value().title = surface;
+    }
+    else
+    {
+        cache.value().title = nullptr;
+    }
+
+    if (this->x_label.has_value())
+    {
+        const auto &x_label = this->x_label.value();
+        auto surface = TTF_RenderText_Solid(Figure::font, x_label.data(), x_label.size(), black);
+        if (!surface)
+        {
+            SDL_Log("TTF_RenderText_Solid Error: %s", SDL_GetError());
+            exit(-1);
+        }
+        cache.value().xlabel = surface;
+    }
+    else
+    {
+        cache.value().xlabel = nullptr;
+    }
+
+    if (this->y_label.has_value())
+    {
+        const auto &y_label = this->y_label.value();
+        auto surface = TTF_RenderText_Solid(Figure::font, y_label.data(), y_label.size(), black);
+        if (!surface)
+        {
+            SDL_Log("TTF_RenderText_Solid Error: %s", SDL_GetError());
+            exit(-1);
+        }
+        cache.value().ylabel = surface;
+    }
+    else
+    {
+        cache.value().ylabel = nullptr;
+    }
+
+    return this->cache.value();
+}
+
+#include "monalisa_font.h"
+
+void Figure::FigureInit()
+{
+
+    SDL_IOStream *io = SDL_IOFromConstMem(MonoLisaRegular, std::size(MonoLisaRegular));
+
+    if (!io)
+    {
+        SDL_Log("SDL_IOFromConstMem Error: %s", SDL_GetError());
+        exit(-1);
+    }
+
+    Figure::font = TTF_OpenFontIO(io, true, 24);
+
+    if (!Figure::font)
+    {
+        SDL_Log("TTF_OpenFontIO Error: %s", SDL_GetError());
+        exit(-1);
+    }
+}
+
+void Figure::FigureInit(TTF_Font *font)
+{
+    if (Figure::font != nullptr)
+    {
+        TTF_CloseFont(Figure::font);
+    }
+
+    Figure::font = TTF_CopyFont(font);
+}
+
+void Figure::FigureQuit()
+{
+    TTF_CloseFont(Figure::font);
+}
+
 void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper<SDL_Rect>> render_area_)
 {
     SDL_Rect render_area = render_area_.has_value() ? render_area_.value() : [renderer]()
@@ -209,33 +321,33 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     }();
 
     // Determine transform values
-    auto positioning = determine_layout(render_area);
+    auto &render_info = get_render_info(render_area);
 
-    auto transform = determine_graph_transform(this->determine_graph_area(), positioning.inner_graph_zone);
+    auto transform = determine_graph_transform(this->determine_graph_area(), render_info.layout.inner_graph_zone);
 
     // Render blank graph
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderFillRect(renderer, &positioning.outer_graph_zone);
+    SDL_RenderFillRect(renderer, &render_info.layout.outer_graph_zone);
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-    SDL_RenderFillRect(renderer, &positioning.inner_graph_zone);
+    SDL_RenderFillRect(renderer, &render_info.layout.inner_graph_zone);
 
     SDL_SetRenderDrawColor(renderer, 255, 0, 0, 128);
-    drawHTextInZone(renderer, positioning.title_zone, this->title.value_or(""));
+    drawHTextInZone(renderer, render_info.layout.title_zone, render_info.title);
 
     SDL_SetRenderDrawColor(renderer, 0, 255, 0, 128);
-    drawHTextInZone(renderer, positioning.xlabel_zone, this->x_label.value_or(""));
+    drawHTextInZone(renderer, render_info.layout.xlabel_zone, render_info.xlabel);
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 255, 128);
-    drawVTextInZone(renderer, positioning.ylabel_zone, this->y_label.value_or(""));
+    drawVTextInZone(renderer, render_info.layout.ylabel_zone, render_info.ylabel);
 
     // Render blank graph background grid
 
     // Render graph objects
     // TODO: Fix draw order so circles plotted at the edge of the graph
     // Don't exscape onto the general canvas
-    auto visitor = [renderer, transform, positioning](const auto &i)
+    auto visitor = [renderer, transform, &render_info](const auto &i)
     {
-        i.render(renderer, transform, positioning.inner_graph_zone);
+        i.render(renderer, transform, render_info.layout.inner_graph_zone);
     };
 
     for (const auto &i : this->draw_data)
@@ -384,4 +496,11 @@ void Figure::DrawablePoint::render(SDL_Renderer *renderer, auto transform, const
     auto ss_point = transform(this->x, this->y);
     auto radius = std::min(graph_area.h, graph_area.w) * 0.05;
     DrawFilledCircle(renderer, ss_point.x, ss_point.y, radius);
+}
+
+Figure::RenderCache::~RenderCache()
+{
+    SDL_DestroySurface(this->title);
+    SDL_DestroySurface(this->xlabel);
+    SDL_DestroySurface(this->ylabel);
 }

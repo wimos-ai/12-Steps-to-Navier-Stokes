@@ -16,6 +16,8 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3_ttf/SDL_ttf.h>
+
 #include <cstdlib>
 #include <cstdio>
 #include <vector>
@@ -58,6 +60,13 @@ int main()
         std::exit(-1);
     }
 
+    if (!TTF_Init())
+    {
+        SDL_Log("TTF_Init failed: %s", SDL_GetError());
+        std::exit(-1);
+    }
+    
+
     SDL_Window *window = SDL_CreateWindow(
         "SDL3 + Dear ImGui Test",
         1280,
@@ -70,6 +79,8 @@ int main()
         SDL_Quit();
         std::exit(-1);
     }
+
+    Figure::FigureInit();
 
     SDL_Renderer *renderer = SDL_CreateRenderer(window, nullptr);
 
@@ -94,6 +105,9 @@ int main()
         { return std::sin(x); });
     fig.plot(2, -0.5);
     fig.plot(x_values, y_values);
+    fig.set_title("Title");
+    fig.set_x_label("XLabel");
+    fig.set_y_label("YLabel");
 
     bool running{true};
     while (running)
