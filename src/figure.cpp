@@ -3,6 +3,7 @@
 #include <cstring>
 #include <ranges>
 #include <algorithm>
+#include <cstdint>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -75,6 +76,17 @@ namespace
         }
     }
 
+
+    SDL_FRect rotate_90(const SDL_FRect &rect)
+    {
+        SDL_FRect out;
+        out.w = rect.h;
+        out.h = rect.w;
+        out.x = rect.x + ((rect.w-rect.h)/2.0);
+        out.y = rect.y + ((rect.h-rect.w)/2.0);
+        return out;
+    }
+
     void drawVTextInZone(SDL_Renderer *renderer, const SDL_FRect &zone, SDL_Surface *surface)
     {
         // Draws vertical text in zone
@@ -88,7 +100,11 @@ namespace
                 std::exit(-1);
             }
 
-            auto dst = determine_h_rectangle(zone, tx->w, tx->h);
+            auto dst = determine_h_rectangle(zone, tx->h, tx->w);
+
+            // We have to rotate the dst rectangle because the call to RenderTexture Rotated
+            // rotates the RECTANGLE and not the texture.
+            dst = rotate_90(dst); 
 
             SDL_RenderTextureRotated(renderer, tx, NULL, &dst, 270, NULL, SDL_FLIP_NONE);
 
@@ -282,7 +298,7 @@ void Figure::FigureInit()
         exit(-1);
     }
 
-    Figure::font = TTF_OpenFontIO(io, true, 24);
+    Figure::font = TTF_OpenFontIO(io, true, 72);
 
     if (!Figure::font)
     {
