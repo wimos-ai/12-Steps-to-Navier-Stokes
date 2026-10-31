@@ -76,14 +76,13 @@ namespace
         }
     }
 
-
     SDL_FRect rotate_90(const SDL_FRect &rect)
     {
         SDL_FRect out;
         out.w = rect.h;
         out.h = rect.w;
-        out.x = rect.x + ((rect.w-rect.h)/2.0);
-        out.y = rect.y + ((rect.h-rect.w)/2.0);
+        out.x = rect.x + ((rect.w - rect.h) / 2.0);
+        out.y = rect.y + ((rect.h - rect.w) / 2.0);
         return out;
     }
 
@@ -104,7 +103,7 @@ namespace
 
             // We have to rotate the dst rectangle because the call to RenderTexture Rotated
             // rotates the RECTANGLE and not the texture.
-            dst = rotate_90(dst); 
+            dst = rotate_90(dst);
 
             SDL_RenderTextureRotated(renderer, tx, NULL, &dst, 270, NULL, SDL_FLIP_NONE);
 
@@ -138,8 +137,22 @@ void Figure::set_y_label(std::string label)
     this->y_label = label;
 }
 
-void Figure::plot(std::span<double> x, std::span<double> y)
+void Figure::plot(std::span<const double> x, std::span<const double> y)
 {
+    if (std::size(x) != std::size(y))
+    {
+        throw std::invalid_argument("Size of x must equal size of y");
+    }
+    if (std::size(x) == 0)
+    {
+        return;
+    }
+    if (std::size(x) == 1)
+    {
+        this->plot(x[0], y[0]);
+        return;
+    }
+
     this->cache.reset();
     this->draw_data.emplace_back(std::in_place_type<Figure::DrawableFunction>, x, y);
 }
@@ -159,7 +172,6 @@ void Figure::clear()
 auto determine_graph_transform(const Figure::Rect &r1, const SDL_FRect &r2)
 {
     /// Determines the affine transform from graph coordinates to SDL canvas coordinates
-    // TODO
 
     return [=](double x_in, double y_in) -> SDL_FPoint
     {
@@ -181,17 +193,17 @@ Figure::Layout Figure::determine_layout(const SDL_Rect &render_area)
 
     constexpr double H_PAD = 0.05;
     constexpr double W_PAD = 0.05;
-    constexpr int BOARDER_WIDTH = 5;
+    constexpr int BORDER_WIDTH = 5;
 
     p.outer_graph_zone.x = render_area.x + W_PAD * render_area.w;
     p.outer_graph_zone.h = (1.0 - (2 * H_PAD)) * render_area.h;
     p.outer_graph_zone.y = render_area.y + H_PAD * render_area.h;
     p.outer_graph_zone.w = (1.0 - (2 * W_PAD)) * render_area.w;
 
-    p.inner_graph_zone.x = p.outer_graph_zone.x + BOARDER_WIDTH;
-    p.inner_graph_zone.h = p.outer_graph_zone.h - (2 * BOARDER_WIDTH);
-    p.inner_graph_zone.y = p.outer_graph_zone.y + BOARDER_WIDTH;
-    p.inner_graph_zone.w = p.outer_graph_zone.w - (2 * BOARDER_WIDTH);
+    p.inner_graph_zone.x = p.outer_graph_zone.x + BORDER_WIDTH;
+    p.inner_graph_zone.h = p.outer_graph_zone.h - (2 * BORDER_WIDTH);
+    p.inner_graph_zone.y = p.outer_graph_zone.y + BORDER_WIDTH;
+    p.inner_graph_zone.w = p.outer_graph_zone.w - (2 * BORDER_WIDTH);
 
     // Title Zone
     p.title_zone.x = render_area.x;
@@ -208,7 +220,7 @@ Figure::Layout Figure::determine_layout(const SDL_Rect &render_area)
     // XLabel Zone
     p.xlabel_zone.x = p.inner_graph_zone.x;
     p.xlabel_zone.w = p.inner_graph_zone.w;
-    p.xlabel_zone.y = p.inner_graph_zone.y + p.inner_graph_zone.h + BOARDER_WIDTH;
+    p.xlabel_zone.y = p.inner_graph_zone.y + p.inner_graph_zone.h + BORDER_WIDTH;
     p.xlabel_zone.h = p.title_zone.h;
 
     return p;
@@ -289,6 +301,10 @@ Figure::RenderCache &Figure::get_render_info(const SDL_Rect &render_area)
 
 void Figure::FigureInit()
 {
+    if (Figure::font != nullptr)
+    {
+        TTF_CloseFont(Figure::font);
+    }
 
     SDL_IOStream *io = SDL_IOFromConstMem(MonoLisaRegular, std::size(MonoLisaRegular));
 
@@ -309,6 +325,11 @@ void Figure::FigureInit()
 
 void Figure::FigureInit(TTF_Font *font)
 {
+    if (font == nullptr)
+    {
+        throw std::invalid_argument("font cannot be null");
+    }
+
     if (Figure::font != nullptr)
     {
         TTF_CloseFont(Figure::font);
@@ -320,6 +341,7 @@ void Figure::FigureInit(TTF_Font *font)
 void Figure::FigureQuit()
 {
     TTF_CloseFont(Figure::font);
+    Figure::font = nullptr;
 }
 
 void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper<SDL_Rect>> render_area_)
@@ -359,8 +381,15 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     // Render blank graph background grid
 
     // Render graph objects
-    // TODO: Fix draw order so circles plotted at the edge of the graph
-    // Don't exscape onto the general canvas
+    SDL_Rect graph_area_i{
+        .x = static_cast<int>(render_info.layout.inner_graph_zone.x),
+        .y = static_cast<int>(render_info.layout.inner_graph_zone.y),
+        .w = static_cast<int>(render_info.layout.inner_graph_zone.w),
+        .h = static_cast<int>(render_info.layout.inner_graph_zone.h),
+    };
+
+    SDL_SetRenderClipRect(renderer, &graph_area_i);
+
     auto visitor = [renderer, transform, &render_info](const auto &i)
     {
         i.render(renderer, transform, render_info.layout.inner_graph_zone);
@@ -370,6 +399,7 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     {
         std::visit(visitor, i);
     }
+    SDL_SetRenderClipRect(renderer, nullptr);
 }
 
 Figure::Rect Figure::determine_graph_area()
@@ -416,16 +446,25 @@ Figure::Rect Figure::determine_graph_area()
     return r;
 }
 
-Figure::DrawableFunction::DrawableFunction(std::span<double> x, std::span<double> y)
+Figure::DrawableFunction::DrawableFunction(std::span<const double> x, std::span<const double> y)
 {
     if (std::size(x) != std::size(y))
     {
         throw std::runtime_error("Sizes of x and y must match");
     }
+    if (std::size(x) < 2)
+    {
+        throw std::invalid_argument("Number of points must be at least two");
+    }
 
     this->num_values = std::size(x);
-    this->x_values = new double[this->num_values];
-    this->y_values = new double[this->num_values];
+
+    std::unique_ptr<double[]> xs{new double[this->num_values]};
+    std::unique_ptr<double[]> ys{new double[this->num_values]};
+
+    this->x_values = xs.release();
+    this->y_values = ys.release();
+
     std::memcpy(this->x_values, x.data(), std::size(x) * sizeof(double));
     std::memcpy(this->y_values, y.data(), std::size(y) * sizeof(double));
 }

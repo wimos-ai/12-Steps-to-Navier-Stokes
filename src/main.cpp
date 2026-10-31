@@ -103,7 +103,7 @@ int main()
         y_values.begin(),
         [](double x)
         { return std::sin(x); });
-    fig.plot(2, -0.5);
+    fig.plot(0, -0.5);
     fig.plot(x_values, y_values);
     fig.set_title("Title");
     fig.set_x_label("XLabel");

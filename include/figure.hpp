@@ -26,7 +26,7 @@ public:
 
     void set_y_label(std::string label);
 
-    void plot(std::span<double> x, std::span<double> y);
+    void plot(std::span<const double> x, std::span<const double> y);
 
     void plot(double x, double y);
 
@@ -56,35 +56,35 @@ private:
     {
     public:
         friend class Figure;
-        DrawableFunction(std::span<double> x, std::span<double> y);
+        DrawableFunction(std::span<const double> x, std::span<const double> y);
 
         // No copy
-        DrawableFunction(DrawableFunction &) = delete;
+        DrawableFunction(const DrawableFunction &) = delete;
         DrawableFunction &operator=(const DrawableFunction &other) = delete;
 
         // Moveable
-        inline DrawableFunction(DrawableFunction &&other) noexcept
+        inline DrawableFunction(DrawableFunction &&other) noexcept : x_values(std::exchange(other.x_values, nullptr)),
+                                                                     y_values(std::exchange(other.y_values, nullptr)),
+                                                                     num_values(std::exchange(other.num_values, 0))
         {
-            this->x_values = other.x_values;
-            this->y_values = other.y_values;
-            this->num_values = other.num_values;
         }
 
-        inline DrawableFunction &operator=(const DrawableFunction &&other) noexcept
+        inline DrawableFunction &operator=(DrawableFunction &&other) noexcept
         {
-            if (this == &other)
+            if (this != &other)
             {
-                return *this;
+                delete[] this->x_values;
+                delete[] this->y_values;
+
+                this->x_values = std::exchange(other.x_values, nullptr);
+                this->y_values = std::exchange(other.y_values, nullptr);
+                this->num_values = std::exchange(other.num_values, 0);
             }
 
-            this->~DrawableFunction(); // clean up our data
-
-            this->x_values = other.x_values;
-            this->y_values = other.y_values;
-            this->num_values = other.num_values;
+            return *this;
         }
 
-        ~DrawableFunction(); // TODO: Free x and y values
+        ~DrawableFunction();
 
     private:
         void render(SDL_Renderer *renderer, auto transform, const SDL_FRect &graph_area) const;
@@ -153,21 +153,54 @@ private:
 
         ~RenderCache();
         inline RenderCache(RenderCache &&other) noexcept
-            : layout(other.layout),
-              title(std::exchange(other.title, nullptr)),
-              xlabel(std::exchange(other.xlabel, nullptr)),
-              ylabel(std::exchange(other.ylabel, nullptr)),
-              area(other.area)
         {
+            if (&other != this)
+            {
+                if (this->title)
+                {
+                    SDL_DestroySurface(this->title);
+                }
+                if (this->xlabel)
+                {
+                    SDL_DestroySurface(this->xlabel);
+                }
+                if (this->ylabel)
+                {
+                    SDL_DestroySurface(this->ylabel);
+                }
+
+                this->layout = other.layout;
+                this->area = other.area;
+                this->title = std::exchange(other.title, nullptr);
+                this->xlabel = std::exchange(other.xlabel, nullptr);
+                this->ylabel = std::exchange(other.ylabel, nullptr);
+            }
         }
 
         inline RenderCache &operator=(RenderCache &&other) noexcept
         {
-            this->layout = other.layout;
-            this->area = other.area;
-            this->title = std::exchange(other.title, nullptr);
-            this->xlabel = std::exchange(other.xlabel, nullptr);
-            this->ylabel = std::exchange(other.ylabel, nullptr);
+            if (&other != this)
+            {
+                if (this->title)
+                {
+                    SDL_DestroySurface(this->title);
+                }
+                if (this->xlabel)
+                {
+                    SDL_DestroySurface(this->xlabel);
+                }
+                if (this->ylabel)
+                {
+                    SDL_DestroySurface(this->ylabel);
+                }
+
+                this->layout = other.layout;
+                this->area = other.area;
+                this->title = std::exchange(other.title, nullptr);
+                this->xlabel = std::exchange(other.xlabel, nullptr);
+                this->ylabel = std::exchange(other.ylabel, nullptr);
+            }
+
             return *this;
         }
 
