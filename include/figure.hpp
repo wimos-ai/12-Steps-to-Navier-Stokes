@@ -7,8 +7,11 @@
 #include <variant>
 #include <memory>
 #include <utility>
+#include <cmath>
 
 #include <SDL3/SDL.h>
+
+#include "utility.hpp"
 
 struct TTF_Font;
 
@@ -130,6 +133,41 @@ private:
     std::vector<UDrawable> draw_data;
 
 private:
+    class Axis
+    {
+    public:
+        inline Axis(double min_, double max_) : min(min_), max(max_)
+        {
+            if (min > max)
+            {
+                throw std::invalid_argument("max must be bigger than min");
+            }
+            double distance = max - min;
+            step = std::pow(10, std::floor(std::log10(distance) - 0.5));
+            start = std::floor(min / step) * step;
+            end = std::ceil(max / step) * step;
+            count = static_cast<size_t>((end - start) / step) + 1;
+        };
+
+        inline size_t size() const
+        {
+            return count;
+        }
+
+        auto ticks() const
+        {
+            return linspace(start, end, count);
+        }
+
+    private:
+        double min;
+        double max;
+        double start;
+        double end;
+        double step;
+        size_t count;
+    };
+
     struct Layout
     {
         SDL_FRect outer_graph_zone;

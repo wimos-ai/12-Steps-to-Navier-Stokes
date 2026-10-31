@@ -361,7 +361,9 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     // Determine transform values
     auto &render_info = get_render_info(render_area);
 
-    auto transform = determine_graph_transform(this->determine_graph_area(), render_info.layout.inner_graph_zone);
+    auto graph_area = this->determine_graph_area();
+
+    auto transform = determine_graph_transform(graph_area, render_info.layout.inner_graph_zone);
 
     // Render blank graph
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
@@ -369,18 +371,13 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(renderer, &render_info.layout.inner_graph_zone);
 
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 128);
     drawHTextInZone(renderer, render_info.layout.title_zone, render_info.title);
 
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 128);
     drawHTextInZone(renderer, render_info.layout.xlabel_zone, render_info.xlabel);
 
-    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 128);
     drawVTextInZone(renderer, render_info.layout.ylabel_zone, render_info.ylabel);
 
-    // Render blank graph background grid
-
-    // Render graph objects
+    // Constrain rendering to graph area
     SDL_Rect graph_area_i{
         .x = static_cast<int>(render_info.layout.inner_graph_zone.x),
         .y = static_cast<int>(render_info.layout.inner_graph_zone.y),
@@ -390,6 +387,37 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
 
     SDL_SetRenderClipRect(renderer, &graph_area_i);
 
+    // Render blank graph background grid
+    SDL_SetRenderDrawColor(renderer, 128, 128, 128, SDL_ALPHA_OPAQUE);
+    Axis x_axis{graph_area.x0, graph_area.xf};
+    for (auto tick : x_axis.ticks())
+    {
+        auto tick_SDL_space = transform(tick, 0).x;
+        SDL_FPoint p0, pf;
+        p0.x = tick_SDL_space;
+        p0.y = render_info.layout.inner_graph_zone.y;
+
+        pf.x = tick_SDL_space;
+        pf.y = render_info.layout.inner_graph_zone.y + render_info.layout.inner_graph_zone.h;
+
+        SDL_RenderLine(renderer, p0.x, p0.y, pf.x, pf.y);
+    }
+
+    Axis y_axis{graph_area.y0, graph_area.yf};
+    for (auto tick : y_axis.ticks())
+    {
+        auto tick_SDL_space = transform(0, tick).y;
+        SDL_FPoint p0, pf;
+        p0.x = render_info.layout.inner_graph_zone.x;
+        p0.y = tick_SDL_space;
+
+        pf.x = render_info.layout.inner_graph_zone.x + render_info.layout.inner_graph_zone.w;
+        pf.y = tick_SDL_space;
+
+        SDL_RenderLine(renderer, p0.x, p0.y, pf.x, pf.y);
+    }
+
+    // Render graph objects
     auto visitor = [renderer, transform, &render_info](const auto &i)
     {
         i.render(renderer, transform, render_info.layout.inner_graph_zone);
@@ -549,7 +577,7 @@ double Figure::Rect::area() const
 void Figure::DrawablePoint::render(SDL_Renderer *renderer, auto transform, const SDL_FRect &graph_area) const
 {
     auto ss_point = transform(this->x, this->y);
-    auto radius = std::min(graph_area.h, graph_area.w) * 0.05;
+    auto radius = std::min(graph_area.h, graph_area.w) * 0.005;
     DrawFilledCircle(renderer, ss_point.x, ss_point.y, radius);
 }
 

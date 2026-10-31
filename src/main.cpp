@@ -25,32 +25,7 @@
 
 #include "render_graph.hpp"
 #include "figure.hpp"
-
-std::vector<double> linspace(double start, double end, size_t num)
-{
-    std::vector<double> result;
-
-    if (num == 0)
-        return result;
-    if (num == 1)
-    {
-        result.push_back(start);
-        return result;
-    }
-
-    result.reserve(num); // Optimize memory allocation
-    double delta = (end - start) / (num - 1);
-
-    for (size_t i = 0; i < num - 1; ++i)
-    {
-        result.push_back(start + delta * i);
-    }
-
-    // Explicitly add the final boundary to avoid floating-point drift
-    result.push_back(end);
-
-    return result;
-}
+#include "utility.hpp"
 
 int main()
 {
@@ -95,7 +70,7 @@ int main()
     // Enable VSync when supported.
     SDL_SetRenderVSync(renderer, 1);
     Figure fig;
-    std::vector<double> x_values = linspace(0, 3.14159 * 2.0, 1000);
+    std::vector<double> x_values{linspacev(0., 3.14159 * 2.0, 1000)};
     std::vector<double> y_values(x_values.size());
     std::transform(
         x_values.begin(),
