@@ -21,7 +21,7 @@ void TestScene::render(SDL_Renderer *renderer)
     auto current_time = std::chrono::steady_clock::now();
 
     auto clock_delta = current_time - previous_time;
-    float dt = std::chrono::duration_cast<std::chrono::milliseconds>(clock_delta).count() / 1000.0;
+    float dt = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(clock_delta).count() / 1000);
 
     previous_time = current_time;
 
@@ -76,13 +76,13 @@ void TestScene::render(SDL_Renderer *renderer)
 
     for (std::size_t i = 0; i < waveform.size(); ++i)
     {
-        const float x =
-            static_cast<float>(i) /
-            static_cast<float>(waveform.size() - 1);
+        const double x =
+            static_cast<double>(i) /
+            static_cast<double>(waveform.size() - 1);
 
         waveform[i] =
             amplitude * std::sin(
-                            2 * std::numbers::pi * frequency * x + elapsed_time);
+                            2.0 * std::numbers::pi * frequency * x + elapsed_time);
     }
 
     ImGui::PlotLines(

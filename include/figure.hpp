@@ -138,9 +138,9 @@ private:
     public:
         inline Axis(double min_, double max_) : min(min_), max(max_)
         {
-            if (min > max)
+            if (min >= max)
             {
-                throw std::invalid_argument("max must be bigger than min");
+                throw std::invalid_argument("max must be strictly greater than min");
             }
             double distance = max - min;
             step = std::pow(10, std::floor(std::log10(distance) - 0.5));
@@ -170,14 +170,17 @@ private:
 
     struct Layout
     {
-        SDL_FRect outer_graph_zone;
-        SDL_FRect inner_graph_zone;
-        SDL_FRect title_zone;
-        SDL_FRect xlabel_zone;
-        SDL_FRect ylabel_zone;
+        SDL_FRect outer_graph_zone{};
+        SDL_FRect inner_graph_zone{};
+        SDL_FRect title_zone{};
+        SDL_FRect xlabel_zone{};
+        SDL_FRect ylabel_zone{};
+        SDL_FRect x_axis_zone{};
+        SDL_FRect y_axis_zone{};
     };
 
     static Layout determine_layout(const SDL_Rect &render_area);
+    static void render_layout_dbg(SDL_Renderer *renderer, const Figure::Layout &layout);
 
     struct RenderCache
     {
@@ -190,29 +193,12 @@ private:
         RenderCache() = default;
 
         ~RenderCache();
-        inline RenderCache(RenderCache &&other) noexcept
+        inline RenderCache(RenderCache &&other) noexcept : layout(other.layout),
+                                                           title(std::exchange(other.title, nullptr)),
+                                                           xlabel(std::exchange(other.xlabel, nullptr)),
+                                                           ylabel(std::exchange(other.ylabel, nullptr)),
+                                                           area(other.area)
         {
-            if (&other != this)
-            {
-                if (this->title)
-                {
-                    SDL_DestroySurface(this->title);
-                }
-                if (this->xlabel)
-                {
-                    SDL_DestroySurface(this->xlabel);
-                }
-                if (this->ylabel)
-                {
-                    SDL_DestroySurface(this->ylabel);
-                }
-
-                this->layout = other.layout;
-                this->area = other.area;
-                this->title = std::exchange(other.title, nullptr);
-                this->xlabel = std::exchange(other.xlabel, nullptr);
-                this->ylabel = std::exchange(other.ylabel, nullptr);
-            }
         }
 
         inline RenderCache &operator=(RenderCache &&other) noexcept

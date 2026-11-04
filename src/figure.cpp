@@ -15,20 +15,17 @@ namespace
 {
     void DrawFilledCircle(SDL_Renderer *renderer, double x, double y, double radius)
     {
+        // TODO: Fix >
         // See: https://stackoverflow.com/questions/65723827/sdl2-function-to-draw-a-filled-circle
-        for (int h = 0; h < radius; h++)
+        auto radius_sq = radius * radius;
+        for (int h = 0; h < std::max(1, static_cast<int>(radius)); h++)
         {
-            for (int w = 0; w < radius; w++)
-            {
-                int dx = radius - w; // horizontal offset
-                int dy = radius - h; // vertical offset
-                if ((dx * dx + dy * dy) < (radius * radius))
-                {
-                    SDL_RenderLine(renderer, x + dx, y + dy, x - dx, y + dy);
-                    SDL_RenderLine(renderer, x + dx, y - dy, x - dx, y - dy);
-                    break;
-                }
-            }
+            // w^2 + h^2 = r^2
+            // w = sqrt(r^2-h^2);
+            double w = std::sqrt(radius_sq - (h * h));
+
+            SDL_RenderLine(renderer, x + w, y + h, x - w, y + h);
+            SDL_RenderLine(renderer, x + w, y - h, x - w, y - h);
         }
     }
 
@@ -81,8 +78,8 @@ namespace
         SDL_FRect out;
         out.w = rect.h;
         out.h = rect.w;
-        out.x = rect.x + ((rect.w - rect.h) / 2.0);
-        out.y = rect.y + ((rect.h - rect.w) / 2.0);
+        out.x = rect.x + ((rect.w - rect.h) / 2.0f);
+        out.y = rect.y + ((rect.h - rect.w) / 2.0f);
         return out;
     }
 
@@ -119,22 +116,22 @@ void Figure::set_graph_area(double x0, double xf, double y0, double yf)
     this->graph_area = Rect(x0, y0, xf, yf);
 }
 
-void Figure::set_title(std::string title)
+void Figure::set_title(std::string title_)
 {
     this->cache.reset();
-    this->title = title;
+    this->title = title_;
 }
 
-void Figure::set_x_label(std::string label)
+void Figure::set_x_label(std::string label_)
 {
     this->cache.reset();
-    this->x_label = label;
+    this->x_label = label_;
 }
 
-void Figure::set_y_label(std::string label)
+void Figure::set_y_label(std::string label_)
 {
     this->cache.reset();
-    this->y_label = label;
+    this->y_label = label_;
 }
 
 void Figure::plot(std::span<const double> x, std::span<const double> y)
@@ -191,14 +188,14 @@ Figure::Layout Figure::determine_layout(const SDL_Rect &render_area)
 
     // Determine graph area
 
-    constexpr double H_PAD = 0.05;
-    constexpr double W_PAD = 0.05;
+    constexpr float H_PAD = 0.05f;
+    constexpr float W_PAD = 0.05f;
     constexpr int BORDER_WIDTH = 5;
 
     p.outer_graph_zone.x = render_area.x + W_PAD * render_area.w;
-    p.outer_graph_zone.h = (1.0 - (2 * H_PAD)) * render_area.h;
+    p.outer_graph_zone.h = (1.0f - (2.0f * H_PAD)) * render_area.h;
     p.outer_graph_zone.y = render_area.y + H_PAD * render_area.h;
-    p.outer_graph_zone.w = (1.0 - (2 * W_PAD)) * render_area.w;
+    p.outer_graph_zone.w = (1.0f - (2.0f * W_PAD)) * render_area.w;
 
     p.inner_graph_zone.x = p.outer_graph_zone.x + BORDER_WIDTH;
     p.inner_graph_zone.h = p.outer_graph_zone.h - (2 * BORDER_WIDTH);
@@ -206,10 +203,10 @@ Figure::Layout Figure::determine_layout(const SDL_Rect &render_area)
     p.inner_graph_zone.w = p.outer_graph_zone.w - (2 * BORDER_WIDTH);
 
     // Title Zone
-    p.title_zone.x = render_area.x;
+    p.title_zone.x = render_area.x + (W_PAD * render_area.w + BORDER_WIDTH);
     p.title_zone.h = render_area.h * H_PAD;
     p.title_zone.y = render_area.y;
-    p.title_zone.w = render_area.w;
+    p.title_zone.w = render_area.w - ((W_PAD * render_area.w + BORDER_WIDTH) * 2.0f);
 
     // YLabel Zone
     p.ylabel_zone.x = render_area.x;
@@ -344,6 +341,30 @@ void Figure::FigureQuit()
     Figure::font = nullptr;
 }
 
+void Figure::render_layout_dbg(SDL_Renderer *renderer, const Figure::Layout &layout)
+{
+    SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &layout.title_zone);
+
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &layout.xlabel_zone);
+
+    SDL_SetRenderDrawColor(renderer, 255, 255, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &layout.ylabel_zone);
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &layout.outer_graph_zone);
+
+    SDL_SetRenderDrawColor(renderer, 255, 0, 255, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &layout.inner_graph_zone);
+
+    SDL_SetRenderDrawColor(renderer, 0, 255, 255, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &layout.x_axis_zone);
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &layout.y_axis_zone);
+}
+
 void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper<SDL_Rect>> render_area_)
 {
     SDL_Rect render_area = render_area_.has_value() ? render_area_.value() : [renderer]()
@@ -360,6 +381,9 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
 
     // Determine transform values
     auto &render_info = get_render_info(render_area);
+
+    // render_layout_dbg(renderer, render_info.layout);
+    // return;
 
     auto graph_area = this->determine_graph_area();
 
@@ -428,6 +452,67 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
         std::visit(visitor, i);
     }
     SDL_SetRenderClipRect(renderer, nullptr);
+
+    // Render tick marks
+    constexpr auto SCALING{0.20};
+    for (auto tick : x_axis.ticks())
+    {
+        char text[100]{};
+        std::snprintf(text, sizeof(text), "%.1e", tick);
+        SDL_Surface *txt_rendered = TTF_RenderText_LCD(Figure::font, text, 0, SDL_Color{.r = 0, .g = 0, .b = 0, .a = SDL_ALPHA_OPAQUE}, SDL_Color{.r = 255, .g = 255, .b = 255, .a = SDL_ALPHA_OPAQUE});
+        if (!txt_rendered)
+        {
+            throw std::runtime_error("TTF_RenderText_Solid");
+        }
+        SDL_Texture *txture = SDL_CreateTextureFromSurface(renderer, txt_rendered);
+        if (!txture)
+        {
+            SDL_DestroySurface(txt_rendered);
+            throw std::runtime_error("SDL_CreateTextureFromSurface");
+        }
+        auto tick_SDL_space = transform(tick, 0).x;
+
+        SDL_FRect render_area;
+        render_area.w = txt_rendered->w * SCALING;
+        render_area.h = txt_rendered->h * SCALING;
+        render_area.x = tick_SDL_space - (render_area.w / 2.0f);
+        render_area.y = (render_info.layout.inner_graph_zone.y + render_info.layout.inner_graph_zone.h) - render_area.h;
+
+        SDL_RenderTexture(renderer, txture, NULL, &render_area);
+
+        SDL_DestroyTexture(txture);
+        SDL_DestroySurface(txt_rendered);
+    }
+
+    for (auto tick : y_axis.ticks())
+    {
+        char text[100]{};
+        std::snprintf(text, sizeof(text), "%.1e", tick);
+        SDL_Surface *txt_rendered = TTF_RenderText_LCD(Figure::font, text, 0, SDL_Color{.r = 0, .g = 0, .b = 0, .a = SDL_ALPHA_OPAQUE}, SDL_Color{.r = 255, .g = 255, .b = 255, .a = SDL_ALPHA_OPAQUE});
+        if (!txt_rendered)
+        {
+            throw std::runtime_error("TTF_RenderText_Solid");
+        }
+        SDL_Texture *txture = SDL_CreateTextureFromSurface(renderer, txt_rendered);
+        if (!txture)
+        {
+            SDL_DestroySurface(txt_rendered);
+            throw std::runtime_error("SDL_CreateTextureFromSurface");
+        }
+
+        auto tick_SDL_space = transform(0, tick).y;
+
+        SDL_FRect render_area;
+        render_area.w = txt_rendered->w * SCALING;
+        render_area.h = txt_rendered->h * SCALING;
+        render_area.x = render_info.layout.inner_graph_zone.x + render_info.layout.inner_graph_zone.w;
+        render_area.y = tick_SDL_space - (render_area.h / 2.0);
+
+        SDL_RenderTexture(renderer, txture, NULL, &render_area);
+
+        SDL_DestroyTexture(txture);
+        SDL_DestroySurface(txt_rendered);
+    }
 }
 
 Figure::Rect Figure::determine_graph_area()
@@ -449,14 +534,14 @@ Figure::Rect Figure::determine_graph_area()
             return d.get_render_area();
         };
 
-        Rect r = std::visit(get_draw_area_visitor, this->draw_data[0]);
+        Rect rv = std::visit(get_draw_area_visitor, this->draw_data[0]);
 
         for (const auto &i : draw_data)
         {
             auto area = std::visit(get_draw_area_visitor, i);
-            r = r.get_bounding_volume(area);
+            rv = rv.get_bounding_volume(area);
         }
-        return r;
+        return rv;
     }();
 
     if (r.x0 == r.xf)
