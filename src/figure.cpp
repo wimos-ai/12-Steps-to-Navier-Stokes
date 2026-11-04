@@ -119,19 +119,19 @@ void Figure::set_graph_area(double x0, double xf, double y0, double yf)
 void Figure::set_title(std::string title_)
 {
     this->cache.reset();
-    this->title = title_;
+    this->title = std::move(title_);
 }
 
 void Figure::set_x_label(std::string label_)
 {
     this->cache.reset();
-    this->x_label = label_;
+    this->x_label = std::move(label_);
 }
 
 void Figure::set_y_label(std::string label_)
 {
     this->cache.reset();
-    this->y_label = label_;
+    this->y_label = std::move(label_);
 }
 
 void Figure::plot(std::span<const double> x, std::span<const double> y)

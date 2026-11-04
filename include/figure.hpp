@@ -37,6 +37,13 @@ public:
 
     void render(SDL_Renderer *renderer, std::optional<std::reference_wrapper<SDL_Rect>> render_area = std::nullopt);
 
+public:
+    static void FigureInit();
+    static void FigureInit(TTF_Font *font);
+
+    static void FigureQuit();
+    static TTF_Font *font;
+
 private:
     class Rect
     {
@@ -90,7 +97,7 @@ private:
 
     using UDrawable = std::variant<DrawableFunction, DrawablePoint>;
 
-protected:
+private:
     Rect determine_graph_area();
 
 private:
@@ -188,11 +195,4 @@ private:
     };
 
     std::optional<RenderCache> cache;
-
-public:
-    static void FigureInit();
-    static void FigureInit(TTF_Font *font);
-
-    static void FigureQuit();
-    static TTF_Font *font;
 };
