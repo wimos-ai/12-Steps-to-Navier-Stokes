@@ -187,8 +187,7 @@ private:
         SDL_FRect title_zone{};
         SDL_FRect xlabel_zone{};
         SDL_FRect ylabel_zone{};
-        SDL_FRect x_axis_zone{};
-        SDL_FRect y_axis_zone{};
+        SDL_Rect render_area{};
     };
 
     static void render_layout_dbg(SDL_Renderer *renderer, const Figure::Layout &layout);

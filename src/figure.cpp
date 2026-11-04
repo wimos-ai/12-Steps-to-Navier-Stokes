@@ -9,6 +9,8 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include "SDL_utils.hpp"
+
 TTF_Font *Figure::font{nullptr};
 
 namespace
@@ -229,16 +231,11 @@ void Figure::render_layout_dbg(SDL_Renderer *renderer, const Figure::Layout &lay
 
     SDL_SetRenderDrawColor(renderer, 255, 0, 255, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(renderer, &layout.inner_graph_zone);
-
-    SDL_SetRenderDrawColor(renderer, 0, 255, 255, SDL_ALPHA_OPAQUE);
-    SDL_RenderFillRect(renderer, &layout.x_axis_zone);
-
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    SDL_RenderFillRect(renderer, &layout.y_axis_zone);
 }
 
 void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper<SDL_Rect>> render_area_)
 {
+
     SDL_Rect render_area = render_area_.has_value() ? render_area_.value() : [renderer]()
     {
         SDL_Rect r;
@@ -259,8 +256,10 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     render_area_f.w = render_area.w;
     SDL_RenderFillRect(renderer, &render_area_f);
 
+    auto cmp = std::equal_to<SDL_Rect>();
+
     // Determine transform values
-    if (!this->cache.has_value())
+    if (!this->cache.has_value() || !cmp(cache.value().layout.render_area, render_area))
     {
         this->cache.emplace(render_area, this->title, this->x_label, this->y_label);
     }
@@ -361,7 +360,7 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     for (auto tick : x_axis.ticks())
     {
 
-        SDL_Texture * txture = texture_from_tick(tick);
+        SDL_Texture *txture = texture_from_tick(tick);
 
         auto tick_SDL_space = transform(tick, 0).x;
 
@@ -378,7 +377,7 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
 
     for (auto tick : y_axis.ticks())
     {
-        SDL_Texture * txture = texture_from_tick(tick);
+        SDL_Texture *txture = texture_from_tick(tick);
 
         auto tick_SDL_space = transform(0, tick).y;
 
@@ -558,16 +557,16 @@ Figure::RenderCache::RenderCache(const SDL_Rect &render_area, const std::optiona
     this->ylabel = surface_from_optional(ylabel);
 }
 
-Figure::Layout::Layout(const SDL_Rect &render_area)
+Figure::Layout::Layout(const SDL_Rect &render_area_) : render_area{render_area_}
 {
     constexpr float H_PAD = 0.05f;
     constexpr float W_PAD = 0.05f;
     constexpr int BORDER_WIDTH = 5;
 
-    this->outer_graph_zone.x = render_area.x + W_PAD * render_area.w;
-    this->outer_graph_zone.h = (1.0f - (2.0f * H_PAD)) * render_area.h;
-    this->outer_graph_zone.y = render_area.y + H_PAD * render_area.h;
-    this->outer_graph_zone.w = (1.0f - (2.0f * W_PAD)) * render_area.w;
+    this->outer_graph_zone.x = render_area_.x + W_PAD * render_area_.w;
+    this->outer_graph_zone.h = (1.0f - (2.0f * H_PAD)) * render_area_.h;
+    this->outer_graph_zone.y = render_area_.y + H_PAD * render_area_.h;
+    this->outer_graph_zone.w = (1.0f - (2.0f * W_PAD)) * render_area_.w;
 
     this->inner_graph_zone.x = this->outer_graph_zone.x + BORDER_WIDTH;
     this->inner_graph_zone.h = this->outer_graph_zone.h - (2 * BORDER_WIDTH);
@@ -575,14 +574,14 @@ Figure::Layout::Layout(const SDL_Rect &render_area)
     this->inner_graph_zone.w = this->outer_graph_zone.w - (2 * BORDER_WIDTH);
 
     // Title Zone
-    this->title_zone.x = render_area.x + (W_PAD * render_area.w + BORDER_WIDTH);
-    this->title_zone.h = render_area.h * H_PAD;
-    this->title_zone.y = render_area.y;
-    this->title_zone.w = render_area.w - ((W_PAD * render_area.w + BORDER_WIDTH) * 2.0f);
+    this->title_zone.x = render_area_.x + (W_PAD * render_area_.w + BORDER_WIDTH);
+    this->title_zone.h = render_area_.h * H_PAD;
+    this->title_zone.y = render_area_.y;
+    this->title_zone.w = render_area_.w - ((W_PAD * render_area_.w + BORDER_WIDTH) * 2.0f);
 
     // YLabel Zone
-    this->ylabel_zone.x = render_area.x;
-    this->ylabel_zone.w = W_PAD * render_area.w;
+    this->ylabel_zone.x = render_area_.x;
+    this->ylabel_zone.w = W_PAD * render_area_.w;
     this->ylabel_zone.y = this->inner_graph_zone.y;
     this->ylabel_zone.h = this->inner_graph_zone.h;
 

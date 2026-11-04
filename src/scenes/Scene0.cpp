@@ -9,7 +9,7 @@ Scene1::Scene1()
     std::transform(x_values.begin(), x_values.end(), y_values.begin(), FN_FWD(std::sin));
     figure.plot(2, -0.5);
     figure.plot(x_values, y_values);
-    figure.set_title("Scene1");
+    figure.set_title("Scene0");
     figure.set_x_label("x");
     figure.set_y_label("sin(x)");
 }
@@ -17,4 +17,8 @@ Scene1::Scene1()
 void Scene1::render(SDL_Renderer *renderer)
 {
     figure.render(renderer);
+}
+
+void Scene1::handle_event(const SDL_Event &)
+{
 }

@@ -98,9 +98,15 @@ App::App() : window(nullptr), renderer(nullptr), scene(nullptr)
 
 void App::run()
 {
+
+    const int TARGET_FPS = 60;
+    const int TARGET_TICKS_PER_FRAME = 1000 / TARGET_FPS; // ~16.67 ms per frame
+
     bool running{true};
     while (running)
     {
+        Uint64 start_time = SDL_GetTicks(); // or SDL_GetPerformanceCounter()
+
         // Process SDL events.
         SDL_Event event;
 
@@ -118,6 +124,7 @@ void App::run()
             {
                 running = false;
             }
+            this->scene->handle_event(event);
         }
 
         ImGui_ImplSDLRenderer3_NewFrame();
@@ -135,6 +142,13 @@ void App::run()
         {
             ImGui::UpdatePlatformWindows();
             ImGui::RenderPlatformWindowsDefault();
+        }
+
+        Uint64 frame_time = SDL_GetTicks() - start_time;
+
+        if (frame_time < TARGET_TICKS_PER_FRAME)
+        {
+            SDL_Delay(TARGET_TICKS_PER_FRAME - frame_time);
         }
     }
 
