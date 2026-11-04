@@ -267,6 +267,14 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
         return r;
     }();
 
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+    SDL_FRect render_area_f;
+    render_area_f.x = render_area.x;
+    render_area_f.y = render_area.y;
+    render_area_f.h = render_area.h;
+    render_area_f.w = render_area.w;
+    SDL_RenderFillRect(renderer, &render_area_f);
+
     // Determine transform values
     if (!this->cache.has_value())
     {

@@ -10,7 +10,7 @@
 #include <stdexcept>
 
 #include "app.hpp"
-#include "testScene.hpp"
+#include "scenes/Scene0.hpp"
 
 void App::backend_init()
 {
@@ -93,7 +93,7 @@ App::App() : window(nullptr), renderer(nullptr), scene(nullptr)
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    this->scene = std::make_unique<TestScene>();
+    this->scene = std::make_unique<Scene1>();
 }
 
 void App::run()
@@ -120,7 +120,14 @@ void App::run()
             }
         }
 
+        ImGui_ImplSDLRenderer3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+
         this->scene->render(this->renderer);
+
+        ImGui::Render();
+        SDL_RenderPresent(renderer);
 
         // Update and Render additional Platform Windows
         // See https://github.com/ocornut/imgui/wiki/Multi-Viewports
