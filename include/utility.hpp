@@ -26,7 +26,8 @@ constexpr auto linspace(T start, T end, std::size_t n)
 }
 
 template <std::floating_point T>
-constexpr std::vector<T> linspacev(T start, T end, std::size_t n){
+constexpr std::vector<T> linspacev(T start, T end, std::size_t n)
+{
     auto range = linspace(start, end, n);
 
     std::vector<T> result(n);
@@ -34,3 +35,7 @@ constexpr std::vector<T> linspacev(T start, T end, std::size_t n){
 
     return result;
 }
+
+#ifndef FN_FWD
+#define FN_FWD(x) [](auto &&...args) -> decltype(auto) { return x(std::forward<decltype(args)>(args)...); }
+#endif

@@ -59,7 +59,18 @@ private:
         double x0, y0, xf, yf;
     };
 
-    friend auto determine_graph_transform(const Figure::Rect &r1, const SDL_FRect &r2);
+    class GraphTransform
+    {
+    public:
+        GraphTransform(const Figure::Rect &r1_, const SDL_FRect &r2_) : r1(r1_), r2(r2_) {};
+
+    public:
+        SDL_FPoint operator()(double x, double y) const;
+
+    private:
+        Figure::Rect r1;
+        SDL_FRect r2;
+    };
 
 private:
     class DrawableFunction
@@ -134,6 +145,24 @@ private:
         auto ticks() const
         {
             return linspace(start, end, count);
+        }
+
+        auto sdl_x_ticks(const Figure::GraphTransform &transform) const
+        {
+            auto x_transform = [transform](auto tick)
+            {
+                return transform(tick, 0).x;
+            };
+            return this->ticks() | std::views::transform(x_transform);
+        }
+
+        auto sdl_y_ticks(const Figure::GraphTransform &transform) const
+        {
+            auto y_transform = [transform](auto tick)
+            {
+                return transform(0, tick).y;
+            };
+            return this->ticks() | std::views::transform(y_transform);
         }
 
     private:

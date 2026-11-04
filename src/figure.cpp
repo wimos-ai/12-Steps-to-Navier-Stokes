@@ -166,22 +166,6 @@ void Figure::clear()
     this->draw_data.clear();
 }
 
-auto determine_graph_transform(const Figure::Rect &r1, const SDL_FRect &r2)
-{
-    /// Determines the affine transform from graph coordinates to SDL canvas coordinates
-
-    return [=](double x_in, double y_in) -> SDL_FPoint
-    {
-        double x_percent = (x_in - r1.x0) / (r1.xf - r1.x0);
-        double x_out = (r2.w * x_percent) + r2.x;
-
-        double y_percent = (y_in - r1.y0) / (r1.yf - r1.y0);
-        double y_out = (r2.h * (1.0 - y_percent)) + r2.y;
-
-        return {static_cast<float>(x_out), static_cast<float>(y_out)};
-    };
-}
-
 #include "monalisa_font.h"
 
 void Figure::FigureInit()
@@ -288,7 +272,7 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
 
     auto graph_area = this->determine_graph_area();
 
-    auto transform = determine_graph_transform(graph_area, render_info.layout.inner_graph_zone);
+    auto transform = Figure::GraphTransform(graph_area, render_info.layout.inner_graph_zone);
 
     // Render blank graph
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
@@ -315,9 +299,8 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     // Render blank graph background grid
     SDL_SetRenderDrawColor(renderer, 128, 128, 128, SDL_ALPHA_OPAQUE);
     Axis x_axis{graph_area.x0, graph_area.xf};
-    for (auto tick : x_axis.ticks())
+    for (auto tick_SDL_space : x_axis.sdl_x_ticks(transform))
     {
-        auto tick_SDL_space = transform(tick, 0).x;
         SDL_FPoint p0, pf;
         p0.x = tick_SDL_space;
         p0.y = render_info.layout.inner_graph_zone.y;
@@ -329,9 +312,8 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     }
 
     Axis y_axis{graph_area.y0, graph_area.yf};
-    for (auto tick : y_axis.ticks())
+    for (auto tick_SDL_space : y_axis.sdl_y_ticks(transform))
     {
-        auto tick_SDL_space = transform(0, tick).y;
         SDL_FPoint p0, pf;
         p0.x = render_info.layout.inner_graph_zone.x;
         p0.y = tick_SDL_space;
@@ -356,9 +338,10 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
 
     // Render tick marks
     constexpr auto SCALING{0.20};
-    for (auto tick : x_axis.ticks())
+
+    auto texture_from_tick = [renderer, &transform](double tick)
     {
-        char text[100]{};
+        char text[100];
         std::snprintf(text, sizeof(text), "%.1e", tick);
         SDL_Surface *txt_rendered = TTF_RenderText_LCD(Figure::font, text, 0, SDL_Color{.r = 0, .g = 0, .b = 0, .a = SDL_ALPHA_OPAQUE}, SDL_Color{.r = 255, .g = 255, .b = 255, .a = SDL_ALPHA_OPAQUE});
         if (!txt_rendered)
@@ -371,48 +354,43 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
             SDL_DestroySurface(txt_rendered);
             throw std::runtime_error("SDL_CreateTextureFromSurface");
         }
+        SDL_DestroySurface(txt_rendered);
+        return txture;
+    };
+
+    for (auto tick : x_axis.ticks())
+    {
+
+        SDL_Texture * txture = texture_from_tick(tick);
+
         auto tick_SDL_space = transform(tick, 0).x;
 
         SDL_FRect render_area;
-        render_area.w = txt_rendered->w * SCALING;
-        render_area.h = txt_rendered->h * SCALING;
+        render_area.w = txture->w * SCALING;
+        render_area.h = txture->h * SCALING;
         render_area.x = tick_SDL_space - (render_area.w / 2.0f);
         render_area.y = (render_info.layout.inner_graph_zone.y + render_info.layout.inner_graph_zone.h) - render_area.h;
 
         SDL_RenderTexture(renderer, txture, NULL, &render_area);
 
         SDL_DestroyTexture(txture);
-        SDL_DestroySurface(txt_rendered);
     }
 
     for (auto tick : y_axis.ticks())
     {
-        char text[100]{};
-        std::snprintf(text, sizeof(text), "%.1e", tick);
-        SDL_Surface *txt_rendered = TTF_RenderText_LCD(Figure::font, text, 0, SDL_Color{.r = 0, .g = 0, .b = 0, .a = SDL_ALPHA_OPAQUE}, SDL_Color{.r = 255, .g = 255, .b = 255, .a = SDL_ALPHA_OPAQUE});
-        if (!txt_rendered)
-        {
-            throw std::runtime_error("TTF_RenderText_Solid");
-        }
-        SDL_Texture *txture = SDL_CreateTextureFromSurface(renderer, txt_rendered);
-        if (!txture)
-        {
-            SDL_DestroySurface(txt_rendered);
-            throw std::runtime_error("SDL_CreateTextureFromSurface");
-        }
+        SDL_Texture * txture = texture_from_tick(tick);
 
         auto tick_SDL_space = transform(0, tick).y;
 
         SDL_FRect render_area;
-        render_area.w = txt_rendered->w * SCALING;
-        render_area.h = txt_rendered->h * SCALING;
+        render_area.w = txture->w * SCALING;
+        render_area.h = txture->h * SCALING;
         render_area.x = render_info.layout.inner_graph_zone.x + render_info.layout.inner_graph_zone.w;
         render_area.y = tick_SDL_space - (render_area.h / 2.0);
 
         SDL_RenderTexture(renderer, txture, NULL, &render_area);
 
         SDL_DestroyTexture(txture);
-        SDL_DestroySurface(txt_rendered);
     }
 }
 
@@ -613,4 +591,15 @@ Figure::Layout::Layout(const SDL_Rect &render_area)
     this->xlabel_zone.w = this->inner_graph_zone.w;
     this->xlabel_zone.y = this->inner_graph_zone.y + this->inner_graph_zone.h + BORDER_WIDTH;
     this->xlabel_zone.h = this->title_zone.h;
+}
+
+SDL_FPoint Figure::GraphTransform::operator()(double x, double y) const
+{
+    double x_percent = (x - r1.x0) / (r1.xf - r1.x0);
+    double x_out = (r2.w * x_percent) + r2.x;
+
+    double y_percent = (y - r1.y0) / (r1.yf - r1.y0);
+    double y_out = (r2.h * (1.0 - y_percent)) + r2.y;
+
+    return {static_cast<float>(x_out), static_cast<float>(y_out)};
 }
