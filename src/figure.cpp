@@ -182,118 +182,6 @@ auto determine_graph_transform(const Figure::Rect &r1, const SDL_FRect &r2)
     };
 }
 
-Figure::Layout Figure::determine_layout(const SDL_Rect &render_area)
-{
-    Figure::Layout p{};
-
-    // Determine graph area
-
-    constexpr float H_PAD = 0.05f;
-    constexpr float W_PAD = 0.05f;
-    constexpr int BORDER_WIDTH = 5;
-
-    p.outer_graph_zone.x = render_area.x + W_PAD * render_area.w;
-    p.outer_graph_zone.h = (1.0f - (2.0f * H_PAD)) * render_area.h;
-    p.outer_graph_zone.y = render_area.y + H_PAD * render_area.h;
-    p.outer_graph_zone.w = (1.0f - (2.0f * W_PAD)) * render_area.w;
-
-    p.inner_graph_zone.x = p.outer_graph_zone.x + BORDER_WIDTH;
-    p.inner_graph_zone.h = p.outer_graph_zone.h - (2 * BORDER_WIDTH);
-    p.inner_graph_zone.y = p.outer_graph_zone.y + BORDER_WIDTH;
-    p.inner_graph_zone.w = p.outer_graph_zone.w - (2 * BORDER_WIDTH);
-
-    // Title Zone
-    p.title_zone.x = render_area.x + (W_PAD * render_area.w + BORDER_WIDTH);
-    p.title_zone.h = render_area.h * H_PAD;
-    p.title_zone.y = render_area.y;
-    p.title_zone.w = render_area.w - ((W_PAD * render_area.w + BORDER_WIDTH) * 2.0f);
-
-    // YLabel Zone
-    p.ylabel_zone.x = render_area.x;
-    p.ylabel_zone.w = W_PAD * render_area.w;
-    p.ylabel_zone.y = p.inner_graph_zone.y;
-    p.ylabel_zone.h = p.inner_graph_zone.h;
-
-    // XLabel Zone
-    p.xlabel_zone.x = p.inner_graph_zone.x;
-    p.xlabel_zone.w = p.inner_graph_zone.w;
-    p.xlabel_zone.y = p.inner_graph_zone.y + p.inner_graph_zone.h + BORDER_WIDTH;
-    p.xlabel_zone.h = p.title_zone.h;
-
-    return p;
-}
-
-Figure::RenderCache &Figure::get_render_info(const SDL_Rect &render_area)
-{
-    if (this->cache.has_value())
-    {
-        const SDL_Rect &cached_area = this->cache.value().area;
-        if (cached_area.h == render_area.h &&
-            cached_area.w == render_area.w &&
-            cached_area.x == render_area.x &&
-            cached_area.y == render_area.y)
-        {
-            return this->cache.value();
-        }
-    }
-    this->cache.reset();
-    this->cache.emplace();
-    cache.value().layout = determine_layout(render_area);
-    cache.value().area = render_area;
-
-    SDL_Color black{0, 0, 0, SDL_ALPHA_OPAQUE};
-
-    if (this->title.has_value())
-    {
-        const auto &title = this->title.value();
-        auto surface = TTF_RenderText_Solid(Figure::font, title.data(), title.size(), black);
-        if (!surface)
-        {
-            SDL_Log("TTF_RenderText_Solid Error: %s", SDL_GetError());
-            exit(-1);
-        }
-        cache.value().title = surface;
-    }
-    else
-    {
-        cache.value().title = nullptr;
-    }
-
-    if (this->x_label.has_value())
-    {
-        const auto &x_label = this->x_label.value();
-        auto surface = TTF_RenderText_Solid(Figure::font, x_label.data(), x_label.size(), black);
-        if (!surface)
-        {
-            SDL_Log("TTF_RenderText_Solid Error: %s", SDL_GetError());
-            exit(-1);
-        }
-        cache.value().xlabel = surface;
-    }
-    else
-    {
-        cache.value().xlabel = nullptr;
-    }
-
-    if (this->y_label.has_value())
-    {
-        const auto &y_label = this->y_label.value();
-        auto surface = TTF_RenderText_Solid(Figure::font, y_label.data(), y_label.size(), black);
-        if (!surface)
-        {
-            SDL_Log("TTF_RenderText_Solid Error: %s", SDL_GetError());
-            exit(-1);
-        }
-        cache.value().ylabel = surface;
-    }
-    else
-    {
-        cache.value().ylabel = nullptr;
-    }
-
-    return this->cache.value();
-}
-
 #include "monalisa_font.h"
 
 void Figure::FigureInit()
@@ -380,7 +268,12 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     }();
 
     // Determine transform values
-    auto &render_info = get_render_info(render_area);
+    if (!this->cache.has_value())
+    {
+        this->cache.emplace(render_area, this->title, this->x_label, this->y_label);
+    }
+
+    auto &render_info = this->cache.value();
 
     // render_layout_dbg(renderer, render_info.layout);
     // return;
@@ -395,11 +288,11 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(renderer, &render_info.layout.inner_graph_zone);
 
-    drawHTextInZone(renderer, render_info.layout.title_zone, render_info.title);
+    drawHTextInZone(renderer, render_info.layout.title_zone, render_info.title.get());
 
-    drawHTextInZone(renderer, render_info.layout.xlabel_zone, render_info.xlabel);
+    drawHTextInZone(renderer, render_info.layout.xlabel_zone, render_info.xlabel.get());
 
-    drawVTextInZone(renderer, render_info.layout.ylabel_zone, render_info.ylabel);
+    drawVTextInZone(renderer, render_info.layout.ylabel_zone, render_info.ylabel.get());
 
     // Constrain rendering to graph area
     SDL_Rect graph_area_i{
@@ -559,7 +452,9 @@ Figure::Rect Figure::determine_graph_area()
     return r;
 }
 
-Figure::DrawableFunction::DrawableFunction(std::span<const double> x, std::span<const double> y)
+Figure::DrawableFunction::DrawableFunction(std::span<const double> x, std::span<const double> y) : x_values(std::make_unique<double[]>(x.size())),
+                                                                                                   y_values(std::make_unique<double[]>(y.size())),
+                                                                                                   num_values(std::max(std::size(x), std::size(y)))
 {
     if (std::size(x) != std::size(y))
     {
@@ -570,28 +465,8 @@ Figure::DrawableFunction::DrawableFunction(std::span<const double> x, std::span<
         throw std::invalid_argument("Number of points must be at least two");
     }
 
-    this->num_values = std::size(x);
-
-    std::unique_ptr<double[]> xs{new double[this->num_values]};
-    std::unique_ptr<double[]> ys{new double[this->num_values]};
-
-    this->x_values = xs.release();
-    this->y_values = ys.release();
-
-    std::memcpy(this->x_values, x.data(), std::size(x) * sizeof(double));
-    std::memcpy(this->y_values, y.data(), std::size(y) * sizeof(double));
-}
-
-Figure::DrawableFunction::~DrawableFunction()
-{
-    delete[] x_values;
-    delete[] y_values;
-#ifndef NDEBUG
-    // Future jacob will thank me for the crashes
-    this->x_values = nullptr;
-    this->y_values = nullptr;
-    this->num_values = 0;
-#endif
+    std::memcpy(this->x_values.get(), x.data(), std::size(x) * sizeof(double));
+    std::memcpy(this->y_values.get(), y.data(), std::size(y) * sizeof(double));
 }
 
 void Figure::DrawableFunction::render(SDL_Renderer *renderer, auto transform, const SDL_FRect &graph_area) const
@@ -622,8 +497,8 @@ void Figure::DrawableFunction::render(SDL_Renderer *renderer, auto transform, co
 
 Figure::Rect Figure::DrawableFunction::get_render_area() const
 {
-    auto xs = std::minmax_element(this->x_values, &this->x_values[this->num_values]);
-    auto ys = std::minmax_element(this->y_values, &this->y_values[this->num_values]);
+    auto xs = std::minmax_element(this->x_values.get(), &this->x_values.get()[this->num_values]);
+    auto ys = std::minmax_element(this->y_values.get(), &this->y_values.get()[this->num_values]);
     return Rect(*xs.first, *ys.first, *xs.second, *ys.second);
 }
 
@@ -666,9 +541,68 @@ void Figure::DrawablePoint::render(SDL_Renderer *renderer, auto transform, const
     DrawFilledCircle(renderer, ss_point.x, ss_point.y, radius);
 }
 
-Figure::RenderCache::~RenderCache()
+Figure::RenderCache::RenderCache(const SDL_Rect &render_area, const std::optional<std::string> &title, const std::optional<std::string> &xlabel, const std::optional<std::string> &ylabel)
 {
-    SDL_DestroySurface(this->title);
-    SDL_DestroySurface(this->xlabel);
-    SDL_DestroySurface(this->ylabel);
+
+    this->layout = Layout(render_area);
+    this->area = render_area;
+
+    auto surface_from_optional = [](const std::optional<std::string> &str) -> Figure::RenderCache::SDL_RAII_Surface
+    {
+        constexpr SDL_Color black{0, 0, 0, SDL_ALPHA_OPAQUE};
+        if (str.has_value())
+        {
+            const auto &str_ = str.value();
+            SDL_Surface *surface = TTF_RenderText_Solid(Figure::font, str_.data(), str_.size(), black);
+            if (!surface)
+            {
+                SDL_Log("TTF_RenderText_Solid Error: %s", SDL_GetError());
+                exit(-1);
+            }
+            return Figure::RenderCache::SDL_RAII_Surface(surface);
+        }
+        else
+        {
+            return nullptr;
+        }
+    };
+
+    this->title = surface_from_optional(title);
+    this->xlabel = surface_from_optional(xlabel);
+    this->ylabel = surface_from_optional(ylabel);
+}
+
+Figure::Layout::Layout(const SDL_Rect &render_area)
+{
+    constexpr float H_PAD = 0.05f;
+    constexpr float W_PAD = 0.05f;
+    constexpr int BORDER_WIDTH = 5;
+
+    this->outer_graph_zone.x = render_area.x + W_PAD * render_area.w;
+    this->outer_graph_zone.h = (1.0f - (2.0f * H_PAD)) * render_area.h;
+    this->outer_graph_zone.y = render_area.y + H_PAD * render_area.h;
+    this->outer_graph_zone.w = (1.0f - (2.0f * W_PAD)) * render_area.w;
+
+    this->inner_graph_zone.x = this->outer_graph_zone.x + BORDER_WIDTH;
+    this->inner_graph_zone.h = this->outer_graph_zone.h - (2 * BORDER_WIDTH);
+    this->inner_graph_zone.y = this->outer_graph_zone.y + BORDER_WIDTH;
+    this->inner_graph_zone.w = this->outer_graph_zone.w - (2 * BORDER_WIDTH);
+
+    // Title Zone
+    this->title_zone.x = render_area.x + (W_PAD * render_area.w + BORDER_WIDTH);
+    this->title_zone.h = render_area.h * H_PAD;
+    this->title_zone.y = render_area.y;
+    this->title_zone.w = render_area.w - ((W_PAD * render_area.w + BORDER_WIDTH) * 2.0f);
+
+    // YLabel Zone
+    this->ylabel_zone.x = render_area.x;
+    this->ylabel_zone.w = W_PAD * render_area.w;
+    this->ylabel_zone.y = this->inner_graph_zone.y;
+    this->ylabel_zone.h = this->inner_graph_zone.h;
+
+    // XLabel Zone
+    this->xlabel_zone.x = this->inner_graph_zone.x;
+    this->xlabel_zone.w = this->inner_graph_zone.w;
+    this->xlabel_zone.y = this->inner_graph_zone.y + this->inner_graph_zone.h + BORDER_WIDTH;
+    this->xlabel_zone.h = this->title_zone.h;
 }

@@ -58,60 +58,30 @@ private:
     class DrawableFunction
     {
     public:
-        friend class Figure;
         DrawableFunction(std::span<const double> x, std::span<const double> y);
 
-        // No copy
-        DrawableFunction(const DrawableFunction &) = delete;
-        DrawableFunction &operator=(const DrawableFunction &other) = delete;
-
-        // Moveable
-        inline DrawableFunction(DrawableFunction &&other) noexcept : x_values(std::exchange(other.x_values, nullptr)),
-                                                                     y_values(std::exchange(other.y_values, nullptr)),
-                                                                     num_values(std::exchange(other.num_values, 0))
-        {
-        }
-
-        inline DrawableFunction &operator=(DrawableFunction &&other) noexcept
-        {
-            if (this != &other)
-            {
-                delete[] this->x_values;
-                delete[] this->y_values;
-
-                this->x_values = std::exchange(other.x_values, nullptr);
-                this->y_values = std::exchange(other.y_values, nullptr);
-                this->num_values = std::exchange(other.num_values, 0);
-            }
-
-            return *this;
-        }
-
-        ~DrawableFunction();
-
-    private:
+    public:
         void render(SDL_Renderer *renderer, auto transform, const SDL_FRect &graph_area) const;
 
     public:
         Rect get_render_area() const;
 
     private:
-        double *x_values{nullptr};
-        double *y_values{nullptr};
+        std::unique_ptr<double[]> x_values;
+        std::unique_ptr<double[]> y_values;
         std::size_t num_values{0};
     };
 
     class DrawablePoint
     {
     public:
-        friend class Figure;
         inline DrawablePoint(double x_, double y_) : x(x_), y(y_) {};
         inline Rect get_render_area() const
         {
             return Rect{x, y, x, y};
         };
 
-    private:
+    public:
         void render(SDL_Renderer *renderer, auto transform, const SDL_FRect &graph_area) const;
 
     private:
@@ -168,8 +138,14 @@ private:
         size_t count;
     };
 
-    struct Layout
+    class Layout
     {
+    public:
+        Layout() = default;
+
+        Layout(const SDL_Rect &render_area);
+
+    public:
         SDL_FRect outer_graph_zone{};
         SDL_FRect inner_graph_zone{};
         SDL_FRect title_zone{};
@@ -179,61 +155,37 @@ private:
         SDL_FRect y_axis_zone{};
     };
 
-    static Layout determine_layout(const SDL_Rect &render_area);
     static void render_layout_dbg(SDL_Renderer *renderer, const Figure::Layout &layout);
 
     struct RenderCache
     {
-        Layout layout{};
-        SDL_Surface *title{nullptr};
-        SDL_Surface *xlabel{nullptr};
-        SDL_Surface *ylabel{nullptr};
-        SDL_Rect area{};
-
+    public:
         RenderCache() = default;
 
-        ~RenderCache();
-        inline RenderCache(RenderCache &&other) noexcept : layout(other.layout),
-                                                           title(std::exchange(other.title, nullptr)),
-                                                           xlabel(std::exchange(other.xlabel, nullptr)),
-                                                           ylabel(std::exchange(other.ylabel, nullptr)),
-                                                           area(other.area)
-        {
-        }
+        RenderCache(const SDL_Rect &render_area, const std::optional<std::string> &title, const std::optional<std::string> &xlabel, const std::optional<std::string> &ylabel);
 
-        inline RenderCache &operator=(RenderCache &&other) noexcept
+    private:
+        class SDLSurfaceDeleter
         {
-            if (&other != this)
+        public:
+            inline void operator()(SDL_Surface *ptr) const
             {
-                if (this->title)
+                if (ptr)
                 {
-                    SDL_DestroySurface(this->title);
+                    SDL_DestroySurface(ptr);
                 }
-                if (this->xlabel)
-                {
-                    SDL_DestroySurface(this->xlabel);
-                }
-                if (this->ylabel)
-                {
-                    SDL_DestroySurface(this->ylabel);
-                }
-
-                this->layout = other.layout;
-                this->area = other.area;
-                this->title = std::exchange(other.title, nullptr);
-                this->xlabel = std::exchange(other.xlabel, nullptr);
-                this->ylabel = std::exchange(other.ylabel, nullptr);
             }
+        };
 
-            return *this;
-        }
+        using SDL_RAII_Surface = std::unique_ptr<SDL_Surface, SDLSurfaceDeleter>;
 
-        // No copy assignment
-        RenderCache(const RenderCache &) = delete;
-        RenderCache &operator=(const RenderCache &) = delete;
+    public:
+        Layout layout{};
+        SDL_RAII_Surface title{nullptr};
+        SDL_RAII_Surface xlabel{nullptr};
+        SDL_RAII_Surface ylabel{nullptr};
+        SDL_Rect area{};
     };
-
-    RenderCache &get_render_info(const SDL_Rect &render_area);
 
     std::optional<RenderCache> cache;
 
