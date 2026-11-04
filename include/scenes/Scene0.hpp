@@ -1,3 +1,4 @@
+#pragma once
 #include "IScene.hpp"
 
 #include "figure.hpp"
