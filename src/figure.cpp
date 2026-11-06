@@ -323,6 +323,7 @@ void Figure::render(SDL_Renderer *renderer, std::optional<std::reference_wrapper
         SDL_RenderLine(renderer, p0.x, p0.y, pf.x, pf.y);
     }
 
+    SDL_SetRenderDrawColor(renderer,255,0,0,SDL_ALPHA_OPAQUE);
     // Render graph objects
     auto visitor = [renderer, transform, &render_info](const auto &i)
     {
