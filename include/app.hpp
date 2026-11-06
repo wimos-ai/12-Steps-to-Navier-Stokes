@@ -19,4 +19,5 @@ private:
     SDL_Renderer *renderer{nullptr};
     uint64_t previous_time;
     std::unique_ptr<IScene> scene;
+    std::ptrdiff_t scene_idx{0};
 };

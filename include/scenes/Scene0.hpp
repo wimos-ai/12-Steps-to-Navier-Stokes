@@ -3,14 +3,14 @@
 
 #include "figure.hpp"
 
-class Scene1 : public IScene
+class Scene0 : public IScene
 {
 public:
-    Scene1();
+    Scene0();
 
     void render(SDL_Renderer *) override;
     void handle_event(const SDL_Event& event) override;
-    ~Scene1() override = default;
+    ~Scene0() override = default;
 
 private:
     Figure figure;

@@ -8,9 +8,11 @@
 
 #include <cstdlib>
 #include <stdexcept>
+#include <algorithm>
 
 #include "app.hpp"
 #include "scenes/Scene0.hpp"
+#include "scenes/Scene1.hpp"
 
 void App::backend_init()
 {
@@ -93,7 +95,7 @@ App::App() : window(nullptr), renderer(nullptr), scene(nullptr)
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    this->scene = std::make_unique<Scene1>();
+    this->scene = std::make_unique<Scene0>();
 }
 
 void App::run()
@@ -101,11 +103,20 @@ void App::run()
 
     const int TARGET_FPS = 60;
     const int TARGET_TICKS_PER_FRAME = 1000 / TARGET_FPS; // ~16.67 ms per frame
+    using SceneFactory = std::unique_ptr<IScene> (*)();
+    constexpr SceneFactory scene_ctors[] = {*[]() -> std::unique_ptr<IScene>
+                                            {
+                                                return std::make_unique<Scene0>();
+                                            },
+                                            *[]() -> std::unique_ptr<IScene>
+                                            {
+                                                return std::make_unique<Scene1>();
+                                            }};
 
     bool running{true};
     while (running)
     {
-        Uint64 start_time = SDL_GetTicks(); // or SDL_GetPerformanceCounter()
+        Uint64 start_time = SDL_GetTicks();
 
         // Process SDL events.
         SDL_Event event;
@@ -124,6 +135,24 @@ void App::run()
             {
                 running = false;
             }
+
+            if (event.type == SDL_EVENT_KEY_DOWN)
+            {
+                if (event.key.key == SDLK_RIGHT || event.key.key == SDLK_LEFT)
+                {
+                    if (event.key.key == SDLK_RIGHT)
+                    {
+                        this->scene_idx += 1;
+                    }
+                    else if (event.key.key == SDLK_LEFT)
+                    {
+                        this->scene_idx -= 1;
+                    }
+                    this->scene_idx = std::max(static_cast<std::ptrdiff_t>(0), std::min(this->scene_idx, static_cast<std::ptrdiff_t>(std::size(scene_ctors) - 1)));
+                    this->scene = scene_ctors[scene_idx]();
+                }
+            }
+
             this->scene->handle_event(event);
         }
 
