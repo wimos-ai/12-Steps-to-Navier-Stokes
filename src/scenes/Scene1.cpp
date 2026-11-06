@@ -22,6 +22,8 @@ Scene1::Scene1() : xvalues(linspacev<double>(0, 5, nx)), yvalues(nt)
 
     double c{1.0};
     double dx{xvalues[1]};
+    double courant_number = (c*dt)/xvalues[1];
+    SDL_Log("Step 1 courant_number: %f", courant_number);
     // Forward Propagation
     for (size_t n = 1; n < nt; n++)
     {

@@ -17,10 +17,10 @@ public:
 
 private:
     Figure figure;
-
-    double dt{1 / 60.0};
-    std::size_t nt{200};
-    std::size_t nx{100};
+    double tf{5.0};
+    double dt{1 / 300.0};
+    std::size_t nt{static_cast<std::size_t>(tf/dt)};
+    std::size_t nx{400};
     std::size_t idx{0};
     std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
     std::vector<double> xvalues;
